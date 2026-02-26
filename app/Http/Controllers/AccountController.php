@@ -34,13 +34,15 @@ class AccountController extends Controller
 
         // Set cookie with token, HTTP-only
         $cookie = cookie(
-            'jwt_token',         // Cookie name
-            $token,              // Value
-            60*24,               // Expire in minutes (here 1 day)
-            null,                // Path
-            null,                // Domain
-            false,               // Secure (set true if using HTTPS)
-            true                 // HttpOnly
+            'jem8_token', 
+            $token, 
+            60*24*30,   // 30 days
+            '/',        // path
+            null,       // domain null for localhost
+            true,      // secure false for local dev
+            true,       // httpOnly
+            false,      // raw
+            'None'       // sameSite safe for local dev
         );
 
         return response()->json([
@@ -66,14 +68,18 @@ class AccountController extends Controller
     {
         // Validate input
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'phone_number' => 'required|string|unique:accounts,phone_number',
             'email' => 'required|string|email|unique:accounts,email',
             'password' => 'required|string|min:6',
         ]);
 
         // Create account with hashed password
         $account = Account::create([
-            'name' => $validated['name'],
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'phone_number' => $validated['phone_number'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
         ]);
