@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('product_images')) {
         Schema::create('product_images', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('product_id'); // FK to products
@@ -19,6 +20,7 @@ return new class extends Migration
 
             $table->foreign('product_id')->references('product_id')->on('products')->onDelete('cascade');
         });
+        }
     }
 
     /**

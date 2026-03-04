@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('cart')) {
         Schema::create('cart', function (Blueprint $table) {
             $table->id('cart_id'); // Primary Key
             $table->unsignedBigInteger('user_id'); // FK to users
@@ -24,6 +25,7 @@ return new class extends Migration
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('product_id')->references('product_id')->on('products')->onDelete('cascade');
         });
+        }
     }
 
     /**

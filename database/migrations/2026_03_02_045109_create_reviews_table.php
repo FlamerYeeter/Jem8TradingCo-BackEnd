@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasTable('reviews')) { 
         Schema::create('reviews', function (Blueprint $table) {
             $table->id('review_id'); // Primary Key
             $table->unsignedBigInteger('product_id'); // FK to products
@@ -21,6 +22,7 @@ return new class extends Migration
             $table->foreign('product_id')->references('product_id')->on('products')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
+        }
     }
 
     public function down(): void

@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('accounts')) {
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
             $table->string('first_name');
@@ -29,6 +30,7 @@ return new class extends Migration
             $table->rememberToken();
             $table->timestamps();
         });
+        }
     }
 
     /**

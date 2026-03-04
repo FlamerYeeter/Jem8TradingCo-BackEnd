@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('products')) {
         Schema::create('products', function (Blueprint $table) {
             $table->id('product_id'); // BIGINT UNSIGNED PK
             $table->string('product_name');
@@ -27,6 +28,7 @@ return new class extends Migration
                 ->on('categories')
                 ->onDelete('cascade');
         });
+        }
     }
 
     /**
