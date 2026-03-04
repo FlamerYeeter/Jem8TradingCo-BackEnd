@@ -69,6 +69,9 @@ class ShopController extends Controller
 
 
     // Show single product details with all images.(kukunin yung id ah)
+<<<<<<< HEAD
+public function 
+=======
     public function showProduct($request, $id){
         $product = Product::with('ProductImages')->find($id);
 
@@ -81,6 +84,7 @@ class ShopController extends Controller
             'images' => $product->ProductImages
         ],200);
     }
+>>>>>>> 8ee739177731040e4861b1a584d56f3d1a77b920
     // Remove item from cart (kukunin yung id)
     public function deleteFromCart(string $id){
         $Cart = Cart::find($id);
