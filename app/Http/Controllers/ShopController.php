@@ -70,6 +70,74 @@ class ShopController extends Controller
             'message' => 'Product added successfully',
             'data' => $product
         ]);
+    }   
+
+    // Show single product details with all images.(kukunin yung id ah)
+    
+    public function showProduct($request, $id){
+        $product = Product::with('ProductImages')->find($id);
+
+        if (!$product) {
+            return response()->json(['message' => 'Product not found'], 404);
+        }
+        
+        return response()->json([
+            'product' => $product,
+            'image' => $product->image
+        ],200);
+    }
+    // Remove item from cart (kukunin yung id)
+    public function deleteFromCart(string $id){
+        $cart = Cart::find($id);
+
+        if (!$cart) {
+            return response()->json(['message' => 'Cart item not found'], 404);
+        }
+
+        $cart->delete();
+
+        return response()->json([
+            'message' => 'Product removed from cart successfully'
+        ], 200);
+    }
+    // Update quantity of a cart item (kukunin id)
+    public function updateCartQuantity(Request $request, string $id){
+        $request->validate([
+            'quantity' => 'required|integer|min:1'
+            
+        ]);
+
+        $Cart = Cart::find($id);
+        
+        if(!$Cart){
+            return response()->json(['message' => 'Cart item not found'], 404);
+        }
+        $Cart->quantity = $request->quantity;
+        $Cart->save();
+
+        return response()->json([
+            'message' => 'Cart quantity updated successfully',
+            'cart' => $Cart
+        ], 200);
+        
     }
 
- 
+    // View current user's cart (kukunin yung id nag user galing sa cookie)
+
+    public function viewCart(Request $request){
+        $user = $request -> user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $cartItems = Cart::with('product')->where('user_id', $user->id)->get();
+        
+        return response()->json([
+            'cartItems' => $cartItems
+        ], 200);
+
+    }
+
+
+}

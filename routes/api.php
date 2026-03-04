@@ -1,10 +1,7 @@
 <?php
-<<<<<<< HEAD
-=======
 
 
 use App\Http\Controllers\ShopController;
->>>>>>> 8ee739177731040e4861b1a584d56f3d1a77b920
 use App\Http\Controllers\AccountController;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
@@ -43,33 +40,18 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::middleware('verified')->get('/dashboard', function() {
         return response()->json(['message' => 'Welcome verified user']);
     });
-<<<<<<< HEAD
-});
-=======
+
+
 
     Route::get('/products/{id}', [ShopController::class, 'showProduct']);
     Route::post('/cart/add', [ShopController::class, 'addToCart']);
     Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
-<<<<<<< HEAD
-<<<<<<< HEAD
     
-});
->>>>>>> 8ee739177731040e4861b1a584d56f3d1a77b920
-=======
-=======
->>>>>>> 7e780d96b690acceb9f7816882a4daeddbc6b1b3
+
     Route::post('/admin/products', [AdminProductController::class, 'addProduct']);
     Route::get('/admin/products', [AdminProductController::class, 'showAllProducts']);
     Route::get('/admin/products/{id}', [AdminProductController::class, 'showProduct']);
     Route::put('/admin/products/{id}', [AdminProductController::class, 'updateProduct']);
     Route::delete('/admin/products/{id}', [AdminProductController::class, 'deleteProduct']);
 });
-<<<<<<< HEAD
->>>>>>> 4206f88515ca6956071ad98f210be0a8df7cc11f
-=======
-=======
-    
-});
->>>>>>> 8ee739177731040e4861b1a584d56f3d1a77b920
->>>>>>> f2a3a00b3f2395d0943b2134bb24c71732a9ac90
->>>>>>> 7e780d96b690acceb9f7816882a4daeddbc6b1b3
+
