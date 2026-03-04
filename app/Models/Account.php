@@ -60,6 +60,7 @@ class Account extends Authenticatable
         'password_reset_code',
         'password_reset_expires_at',
         'email_verified_at',
+        'profile_image'
     ];
 
     protected $hidden = [

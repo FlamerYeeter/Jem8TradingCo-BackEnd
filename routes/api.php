@@ -19,9 +19,10 @@ Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 Route::middleware([EnsureTokenIsValid::class])->group(function () {
 
     // Route only accessible to authenticated users
-    Route::get('/me', function(Request $request) {
-        return $request->user();
-    });
+    Route::get('/me', [AccountController::class, 'me']);
+    Route::post('/profile/update', [AccountController::class, 'updateProfile']);
+    Route::post('/profile/update-image', [AccountController::class, 'updateProfileImage']);
+    Route::delete('/delete-account', [AccountController::class, 'destroy']);
 
     Route::post('/logout', [AccountController::class, 'logout']);
 
