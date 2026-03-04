@@ -8,8 +8,8 @@ class Product extends Model
 {
     use HasFactory;
 
-    protected $primaryKey = 'product_id';  // your PK
-    protected $table = 'products';          // optional if table name matches
+    protected $primaryKey = 'product_id';
+    protected $table = 'products';
 
     protected $fillable = [
         'product_name',
@@ -21,10 +21,30 @@ class Product extends Model
         'reviews_id',
     ];
 
-    // A product can have many images
+    protected $casts = [
+        'isSale' => 'boolean',
+        'price' => 'decimal:2'
+    ];
+
+    protected $appends = ['primary_image_url']; // Add this
+
+    // Relationship with Category
+    public function category()
+    {
+        return $this->belongsTo(Category::class, 'category_id', 'category_id');
+    }
+
+    // Relationship with Images
     public function images()
     {
         return $this->hasMany(ProductImage::class, 'product_id', 'product_id');
+    }
+
+    // Accessor for primary image URL
+    public function getPrimaryImageUrlAttribute()
+    {
+        $primaryImage = $this->images->where('is_primary', true)->first();
+        return $primaryImage ? $primaryImage->image_url : null;
     }
 
     // A product can have many cart items
