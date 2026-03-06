@@ -20,14 +20,14 @@ class EnsureTokenIsValid
         Log::debug($token . " from middleware");
         return !empty($token); // or false based on validation
     }
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next)
     {
         $token = $request->cookie('jem8_token');
 
-        if(!$token) {
+        if (!$token) {
             return response()->json([
-                'status' => 'Failed',
-                'message' => 'Token is invalid',
+                'status' => 'failed',
+                'message' => 'No token found'
             ], 401);
         }
 
@@ -35,15 +35,13 @@ class EnsureTokenIsValid
 
         if (!$accessToken) {
             return response()->json([
-                'status'  => 'failed',
+                'status' => 'failed',
                 'message' => 'Invalid or expired token'
             ], 401);
         }
 
-        // Attach authenticated user to request
-        $request->setUserResolver(function () use ($accessToken) {
-            return $accessToken->tokenable;
-        });
+        // Set authenticated user
+        auth()->setUser($accessToken->tokenable);
 
         return $next($request);
     }

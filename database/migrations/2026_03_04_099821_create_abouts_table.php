@@ -11,21 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('abouts')) {
         Schema::create('abouts', function (Blueprint $table) {
             $table->id('about_id');
             $table->string('mission', 255);
             $table->string('vission', 255);
-            $table->unsignedBigInteger('leadership_id');
+            $table->foreignId('leadership_id')
+                ->constrained('admin_leaderships', 'leadership_id')
+                ->onDelete('cascade');
             $table->string('about_desc', 255);
             $table->timestamps();
-
-            $table->foreign('leadership_id')
-                  ->references('leadership_id')
-                  ->on('admin_leaderships')
-                  ->onDelete('cascade');
-            });
-        }
+        });
     }
 
     /**

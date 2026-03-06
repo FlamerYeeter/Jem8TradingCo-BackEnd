@@ -35,9 +35,15 @@ return new class extends Migration
                   ->onDelete('cascade');
 
             $table->foreign('cart_id')
+<<<<<<< HEAD
                   ->references('cart_id')
                   ->on('carts')
                   ->onDelete('cascade');
+=======
+                ->references('cart_id')
+                ->on('cart')
+                ->onDelete('cascade');
+>>>>>>> 56c9bc192dea37e0c9c945ceb4630dfbc85b88ed
 
             $table->foreign('discount_id')
                   ->references('discount_id')

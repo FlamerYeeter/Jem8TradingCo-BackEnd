@@ -21,9 +21,15 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('chatroom_id')
+<<<<<<< HEAD:database/migrations/2026_03_04_032022_create_messages_table.php
                   ->references('chatroom_id')
                   ->on('live_chats')
                   ->onDelete('cascade');
+=======
+                ->references('chatroom_id')
+                ->on('live_chats')
+                ->onDelete('cascade');
+>>>>>>> 56c9bc192dea37e0c9c945ceb4630dfbc85b88ed:database/migrations/2026_03_06_098022_create_messages_table.php
             });
         }
     }

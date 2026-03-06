@@ -6,31 +6,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         if (!Schema::hasTable('cart')) {
-        Schema::create('cart', function (Blueprint $table) {
-            $table->id('cart_id'); // Primary Key
-            $table->unsignedBigInteger('user_id'); // FK to users
-            $table->unsignedBigInteger('product_id'); // FK to products
-            $table->integer('quantity')->default(1);
-            $table->decimal('total', 10, 2);
-            $table->string('status')->default('pending'); // pending, completed
-            $table->timestamps();
-
-            // foreign keys
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('product_id')->references('product_id')->on('products')->onDelete('cascade');
-        });
+            Schema::create('cart', function (Blueprint $table) {
+                $table->id(); // PK 'id' (unsigned BIGINT)
+                $table->foreignId('user_id')->constrained('accounts')->onDelete('cascade');
+                $table->foreignId('product_id')->constrained('products', 'product_id')->onDelete('cascade');
+                $table->integer('quantity')->default(1);
+                $table->decimal('total', 10, 2);
+                $table->string('status')->default('pending');
+                $table->timestamps();
+            });
         }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('cart');

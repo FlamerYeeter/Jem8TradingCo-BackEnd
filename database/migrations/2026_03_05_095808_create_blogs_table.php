@@ -12,7 +12,7 @@ return new class extends Migration
         if (!Schema::hasTable('blog')) {
             Schema::create('blog', function (Blueprint $table) {
                 $table->id('blog_id');
-                $table->unsignedBigInteger('category_blog_id');
+                $table->unsignedInteger('category_blog_id');
                 $table->string('blog_title', 255);
                 $table->text('blog_text');
                 $table->string('featured_image', 255)->nullable();
@@ -24,7 +24,7 @@ return new class extends Migration
 
                 $table->foreign('category_blog_id')
                       ->references('category_blog_id')
-                      ->on('category_blog')
+                      ->on('category_blogs')
                       ->onDelete('cascade');
             });
         }

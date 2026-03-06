@@ -1,0 +1,138 @@
+{
+  "info": {
+    "name": "Jem8 API - Postman Tests",
+    "_postman_id": "jem8-api-tests",
+    "description": "Basic flow: register -> verify (manual) -> login -> list products -> add to cart -> checkout",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost" },
+    { "key": "email", "value": "tester@example.com" },
+    { "key": "password", "value": "pass1234" },
+    { "key": "phone_number", "value": "09123456789" },
+    { "key": "first_name", "value": "Tester" },
+    { "key": "last_name", "value": "User" },
+    { "key": "jem8_token", "value": "" },
+    { "key": "product_id", "value": "" },
+    { "key": "verification_code", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"{{first_name}}\",\n  \"last_name\": \"{{last_name}}\",\n  \"phone_number\": \"{{phone_number}}\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/register", "host": ["{{base_url}}"], "path": ["api","register"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 201 or 200', function () { pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+              "pm.test('Response contains account', function(){ try{ const j = pm.response.json(); pm.expect(j).to.be.an('object'); }catch(e){ pm.test('JSON parse', ()=>{throw e}); } });",
+              "pm.environment.set('email', pm.environment.get('email'));",
+              "// After registering you must retrieve the verification code from the database and set the environment variable 'verification_code' before running the Verify request. Example SQL: SELECT email_verification_code FROM accounts WHERE email='{{email}}'"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verify (manual)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{verification_code}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/verify", "host": ["{{base_url}}"], "path": ["api","verify"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.test('Status is 200', function () { pm.expect(pm.response.code).to.be.oneOf([200,201]); });"] }
+        }
+      ]
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/login", "host": ["{{base_url}}"], "path": ["api","login"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Login status 200', function () { pm.expect(pm.response.code).to.equal(200); });",
+              "var setCookie = pm.response.headers.get('set-cookie') || pm.response.headers.get('Set-Cookie');",
+              "if (setCookie) { var m = setCookie.match(/jem8_token=([^;]+)/); if (m) { pm.environment.set('jem8_token', m[1]); } }",
+              "pm.test('jem8_token set', function(){ pm.expect(pm.environment.get('jem8_token')).to.not.be.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Products (set product_id)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Cookie", "value": "jem8_token={{jem8_token}}" } ],
+        "url": { "raw": "{{base_url}}/api/admin/products", "host": ["{{base_url}}"], "path": ["api","admin","products"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function(){ pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+              "try { var j = pm.response.json(); if (j.products && j.products.length>0) { pm.environment.set('product_id', j.products[0].product_id); pm.test('product_id set', ()=>pm.expect(pm.environment.get('product_id')).to.not.be.empty); } else { pm.test('products present', ()=>{ throw new Error('No products returned'); }); } } catch(e) { pm.test('parse json', ()=>{ throw e }); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Add To Cart",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Cookie", "value": "jem8_token={{jem8_token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1\n}" },
+        "url": { "raw": "{{base_url}}/api/cart/add", "host": ["{{base_url}}"], "path": ["api","cart","add"] }
+      },
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test('Add to cart created', function(){ pm.expect(pm.response.code).to.be.oneOf([200,201]); });" ] } } ]
+    },
+    {
+      "name": "Checkout",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Cookie", "value": "jem8_token={{jem8_token}}" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"payment_method\": \"card\",\n  \"payment_reference\": \"TEST123\",\n  \"shipping_fee\": 0\n}" },
+        "url": { "raw": "{{base_url}}/api/checkout", "host": ["{{base_url}}"], "path": ["api","checkout"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Checkout status 201', function(){ pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+              "try { var j = pm.response.json(); if (j.receipt) pm.environment.set('receipt_id', j.receipt.receipt_id); if (j.invoice) pm.environment.set('invoice_id', j.invoice.invoice_id); } catch(e) { pm.test('parse json', ()=>{ throw e }); }",
+              "pm.test('receipt/invoice set', function(){ pm.expect(pm.environment.get('receipt_id')||pm.environment.get('invoice_id')).to.not.be.empty; });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
