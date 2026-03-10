@@ -11,32 +11,23 @@ class UserAddress extends Model
 
     protected $table = 'user_addresses';
 
-    protected $primaryKey = 'id';
-
     protected $fillable = [
         'user_id',
         'type',
-
-        // company info
         'company_name',
         'company_role',
         'company_number',
         'company_email',
-
-        // address fields
         'street',
         'barangay',
         'city',
         'province',
         'postal_code',
         'country',
-
         'status',
     ];
 
-    /**
-     * Relationship: Address belongs to a user
-     */
+    // optional: relation to user/account
     public function user()
     {
         return $this->belongsTo(Account::class, 'user_id');
