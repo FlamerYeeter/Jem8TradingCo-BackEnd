@@ -11,7 +11,8 @@ class ShopController extends Controller
 {
     // gawin nyo nalang yung mga nasa list jan
     // Add product to cart
-    public function addToCart(Request $request){
+    public function addToCart(Request $request)
+    {
         $user = $request->user();
 
         if (!$user) {
@@ -19,34 +20,17 @@ class ShopController extends Controller
         }
 
         $request->validate([
-            'quantity' => 'required|integer|min:1',
-            'product_id' => 'required|integer|exists:products,product_id'
-        ]);
-
-        $Cart = Cart::create([
-            'user_id' => $user->id,
-            'quantity' => $request->quantity,
-            'product_id' => $request->product_id,
-            'total' => floatval($product->price) * intval($request->quantity),
-            'status' => 'active',
-        ]);
-
-        if (!$Cart) {
-            return response()->json(['message' => 'Failed to add product to cart'], 500);
-        }
-
-        $request->validate([
             'quantity'   => 'required|integer|min:1',
-            'product_id' => 'required|integer|exists:products,product_id' // ✅
+            'product_id' => 'required|integer|exists:products,product_id'
         ]);
 
         $product = Product::find($request->product_id);
 
         $cart = Cart::create([
-            'quantity'   => $request->quantity,
+            'user_id'    => $user->id,
             'product_id' => $request->product_id,
-            'user_id'    => $user->id,                              // ✅ matches migration
-            'total'      => $product->price * $request->quantity,  // ✅ auto compute
+            'quantity'   => $request->quantity,
+            'total'      => $product->price * $request->quantity,
             'status'     => 'pending'
         ]);
 
@@ -154,7 +138,6 @@ class ShopController extends Controller
         return response()->json([
             'cartItems' => $cartItems
         ], 200);
-
     }
 
 

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\EnsureTokenIsValid;
 use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\UserAddressController;
+use App\Http\Controllers\CategoryController;
 // Public routes
 Route::post('/login', [AccountController::class, 'login']);
 Route::post('/register', [AccountController::class, 'store']);
@@ -25,7 +26,7 @@ Route::get('/products/{id}', [ShopController::class, 'showProduct']);
 Route::get('/reviews', [ReviewController::class, 'all']);
 Route::get('/reviews/{review}', [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
-
+Route::get('/categories', [CategoryController::class, 'index']);
 
 // Routes that require authentication
 Route::middleware([EnsureTokenIsValid::class])->group(function () {
@@ -55,6 +56,8 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     // Shop
     Route::post('/cart/add', [ShopController::class, 'addToCart']);
     Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
+    Route::patch('/cart/{id}',[ShopController::class, 'updateCartQuantity']);
+    Route::get('/cart',[ShopController::class, 'viewCart']);
 
     // Admin Products
     Route::post('/admin/products', [AdminProductController::class, 'addProduct']);
@@ -77,13 +80,13 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 
     // Cart
-    Route::get('/cart', [CartController::class, 'index']);
-    Route::post('/cart', [CartController::class, 'store']);
-    Route::put('/cart/{cart}', [CartController::class, 'update']);
-    Route::patch('/cart/{cart}', [CartController::class, 'update']);
-    Route::delete('/cart/{cart}', [CartController::class, 'destroy']);
-    Route::delete('/cart/product/{product}', [CartController::class, 'destroyByProduct']);
-    Route::post('/cart/clear', [CartController::class, 'clear']);
+    // Route::get('/cart', [CartController::class, 'index']);
+    // Route::post('/cart', [CartController::class, 'store']);
+    // Route::put('/cart/{cart}', [CartController::class, 'update']);
+    // Route::patch('/cart/{cart}', [CartController::class, 'update']);
+    // Route::delete('/cart/{cart}', [CartController::class, 'destroy']);
+    // Route::delete('/cart/product/{product}', [CartController::class, 'destroyByProduct']);
+    // Route::post('/cart/clear', [CartController::class, 'clear']);
 
     // Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);
