@@ -94,6 +94,7 @@ class AccountController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Login successful',
+            'token' => $token
         ])->withCookie($cookie);
     }
         // ==============================

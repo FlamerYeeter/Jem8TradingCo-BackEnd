@@ -89,7 +89,18 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     // Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);
 
-    // Addresses
+    // Admin product management (requires auth)
+    Route::prefix('admin')->group(function () {
+        Route::post('/products', [AdminProductController::class, 'addProduct']);
+        Route::get('/products', [AdminProductController::class, 'showAllProducts']);
+        Route::get('/products/{id}', [AdminProductController::class, 'showProduct']);
+        Route::post('/products/{id}', [AdminProductController::class, 'updateProduct']);
+        Route::put('/products/{id}', [AdminProductController::class, 'updateProduct']);
+        Route::delete('/products/{id}', [AdminProductController::class, 'deleteProduct']);
+        Route::post('/products/test-upload', [AdminProductController::class, 'testUpload']);
+        Route::get('/products/storage-info', [AdminProductController::class, 'storageInfo']);
+    });
+
     Route::get('/addresses', [UserAddressController::class, 'index']);
     Route::post('/addresses', [UserAddressController::class, 'store']);
     Route::get('/addresses/{id}', [UserAddressController::class, 'show']);
