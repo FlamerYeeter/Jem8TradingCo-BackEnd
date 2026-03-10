@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\EnsureTokenIsValid;
 use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\UserAddressController;
+use App\Http\Controllers\CategoryController;
 // Public routes
 Route::post('/login', [AccountController::class, 'login']);
 Route::post('/register', [AccountController::class, 'store']);
@@ -20,7 +21,7 @@ Route::post('/forgot-password', [AccountController::class, 'forgotPassword']);
 Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 
 Route::get('/products/{id}', [ShopController::class, 'showProduct']);
-
+Route::get('/categories', [CategoryController::class, 'index']);
 // Reviews (public)
 Route::get('/reviews', [ReviewController::class, 'all']);
 Route::get('/reviews/{review}', [ReviewController::class, 'show']);
@@ -77,13 +78,13 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 
     // Cart
-    Route::get('/cart', [CartController::class, 'index']);
-    Route::post('/cart', [CartController::class, 'store']);
-    Route::put('/cart/{cart}', [CartController::class, 'update']);
-    Route::patch('/cart/{cart}', [CartController::class, 'update']);
-    Route::delete('/cart/{cart}', [CartController::class, 'destroy']);
-    Route::delete('/cart/product/{product}', [CartController::class, 'destroyByProduct']);
-    Route::post('/cart/clear', [CartController::class, 'clear']);
+    // Route::get('/cart', [CartController::class, 'index']);
+    // Route::post('/cart', [CartController::class, 'store']);
+    // Route::put('/cart/{cart}', [CartController::class, 'update']);
+    // Route::patch('/cart/{cart}', [CartController::class, 'update']);
+    // Route::delete('/cart/{cart}', [CartController::class, 'destroy']);
+    // Route::delete('/cart/product/{product}', [CartController::class, 'destroyByProduct']);
+    // Route::post('/cart/clear', [CartController::class, 'clear']);
 
     // Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);
@@ -94,4 +95,9 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/addresses/{id}', [UserAddressController::class, 'show']);
     Route::put('/addresses/{id}', [UserAddressController::class, 'update']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
+
+    Route::post('/categories', [CategoryController::class, 'store']);
+    Route::get('/categories/{id}', [CategoryController::class, 'show']);
+    Route::put('/categories/{id}', [CategoryController::class, 'update']);
+    Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
 });

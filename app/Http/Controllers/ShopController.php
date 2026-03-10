@@ -11,50 +11,53 @@ class ShopController extends Controller
 {
     // gawin nyo nalang yung mga nasa list jan
     // Add product to cart
-    public function addToCart(Request $request){
-        $user = $request->user();
+public function addToCart(Request $request)
+{
+    // Use auth() helper instead of $request->user() for reliability
+    $user = auth('sanctum')->user();
 
-        if (!$user) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
+    if (!$user) {
+        \Log::warning('Cart add failed – no authenticated user', ['ip' => $request->ip()]);
+        return response()->json(['message' => 'Unauthorized – please log in'], 401);
+    }
 
-        $request->validate([
-            'quantity' => 'required|integer|min:1',
-            'product_id' => 'required|integer|exists:products,product_id'
-        ]);
+    // Validate request
+    $request->validate([
+        'quantity'   => 'required|integer|min:1',
+        'product_id' => 'required|integer|exists:products,product_id',
+    ]);
 
-        $Cart = Cart::create([
-            'user_id' => $user->id,
-            'quantity' => $request->quantity,
-            'product_id' => $request->product_id,
-            'total' => floatval($product->price) * intval($request->quantity),
-            'status' => 'active',
-        ]);
+    // Find product
+    $product = Product::find($request->product_id);
+    if (!$product) {
+        \Log::warning("Cart add failed – product_id {$request->product_id} not found");
+        return response()->json(['message' => 'Product not found'], 404);
+    }
 
-        if (!$Cart) {
-            return response()->json(['message' => 'Failed to add product to cart'], 500);
-        }
-
-        $request->validate([
-            'quantity'   => 'required|integer|min:1',
-            'product_id' => 'required|integer|exists:products,product_id' // ✅
-        ]);
-
-        $product = Product::find($request->product_id);
-
-        $cart = Cart::create([
-            'quantity'   => $request->quantity,
-            'product_id' => $request->product_id,
-            'user_id'    => $user->id,                              // ✅ matches migration
-            'total'      => $product->price * $request->quantity,  // ✅ auto compute
-            'status'     => 'pending'
-        ]);
+    try {
+        // Create or update cart item
+        $cart = Cart::updateOrCreate(
+            [
+                'user_id'    => $user->id,
+                'product_id' => $product->product_id,
+                'status'     => 'pending',
+            ],
+            [
+                'quantity' => $request->quantity,
+                'total'    => $product->price * $request->quantity,
+            ]
+        );
 
         return response()->json([
             'message' => 'Product added to cart successfully',
-            'cart'    => $cart
+            'cart'    => $cart,
         ], 201);
+
+    } catch (\Exception $e) {
+        \Log::error('Cart add failed: ' . $e->getMessage());
+        return response()->json(['message' => 'Failed to add product to cart'], 500);
     }
+}
 
     public function addProduct(Request $request)
     {
