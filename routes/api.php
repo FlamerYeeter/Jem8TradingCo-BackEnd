@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\EnsureTokenIsValid;
 use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\UserAddressController;
+use App\Http\Controllers\CategoryController;
 // Public routes
 Route::post('/login', [AccountController::class, 'login']);
 Route::post('/register', [AccountController::class, 'store']);
@@ -26,11 +27,15 @@ Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 Route::get('/reviews', [ReviewController::class, 'all']);
 Route::get('/reviews/{review}', [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
+<<<<<<< HEAD
 
 //Prods
 
 
 
+=======
+Route::get('/categories', [CategoryController::class, 'index']);
+>>>>>>> b72102445d6da729602f0c0ea850cc8c9f12f57c
 
 // Routes that require authentication
 Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
@@ -59,12 +64,20 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     });
 
     // Shop
+<<<<<<< HEAD
     // Route::get('/products', [ShopController::class, 'index']);
     // Route::get('/products/category/{category}', [ShopController::class, 'productsByCategory']);
     // Route::post('/products', [ShopController::class, 'addProduct']);
     // Route::put('/products/{id}', [ShopController::class, 'updateProduct']);
     
     //
+=======
+    //Hello
+    Route::post('/cart/add', [ShopController::class, 'addToCart']);
+    Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
+    Route::patch('/cart/{id}',[ShopController::class, 'updateCartQuantity']);
+    Route::get('/cart',[ShopController::class, 'viewCart']);
+>>>>>>> b72102445d6da729602f0c0ea850cc8c9f12f57c
 
     // Admin Products
     Route::post('/admin/products', [AdminProductController::class, 'addProduct']);
@@ -87,27 +100,26 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 
     // Cart
+<<<<<<< HEAD
     Route::post('/cart/add', [ShopController::class, 'addToCart']);
     Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
     Route::put('/cart/{id}', [ShopController::class, 'updateCartQuantity']);
     Route::get('/products/{id}', [ShopController::class, 'showProduct']);
 
+=======
+    // Route::get('/cart', [CartController::class, 'index']);
+    // Route::post('/cart', [CartController::class, 'store']);
+    // Route::put('/cart/{cart}', [CartController::class, 'update']);
+    // Route::patch('/cart/{cart}', [CartController::class, 'update']);
+    // Route::delete('/cart/{cart}', [CartController::class, 'destroy']);
+    // Route::delete('/cart/product/{product}', [CartController::class, 'destroyByProduct']);
+    // Route::post('/cart/clear', [CartController::class, 'clear']);
+>>>>>>> b72102445d6da729602f0c0ea850cc8c9f12f57c
 
     // Checkout
     
 
-    // Admin product management (requires auth)
-    Route::prefix('admin')->group(function () {
-        Route::post('/products', [AdminProductController::class, 'addProduct']);
-        Route::get('/products', [AdminProductController::class, 'showAllProducts']);
-        Route::get('/products/{id}', [AdminProductController::class, 'showProduct']);
-        Route::post('/products/{id}', [AdminProductController::class, 'updateProduct']);
-        Route::put('/products/{id}', [AdminProductController::class, 'updateProduct']);
-        Route::delete('/products/{id}', [AdminProductController::class, 'deleteProduct']);
-        Route::post('/products/test-upload', [AdminProductController::class, 'testUpload']);
-        Route::get('/products/storage-info', [AdminProductController::class, 'storageInfo']);
-    });
-
+    // Addresses
     Route::get('/addresses', [UserAddressController::class, 'index']);
     Route::post('/addresses', [UserAddressController::class, 'store']);
     Route::get('/addresses/{id}', [UserAddressController::class, 'show']);

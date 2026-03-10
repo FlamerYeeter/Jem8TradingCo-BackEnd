@@ -11,13 +11,22 @@ class ShopController extends Controller
 {
     // gawin nyo nalang yung mga nasa list jan
     // Add product to cart
+<<<<<<< HEAD
     public function addToCart(Request $request){
         try{
 
+=======
+    public function addToCart(Request $request)
+    {
+>>>>>>> b72102445d6da729602f0c0ea850cc8c9f12f57c
         $user = $request->user();
     
         if (!$user) {
+<<<<<<< HEAD
             return response()->json(['message' => 'bruhhh'], 401);
+=======
+            return response()->json(['message' => 'Unauthorized'], 401);
+>>>>>>> b72102445d6da729602f0c0ea850cc8c9f12f57c
         }
 
         $request->validate([
@@ -29,10 +38,17 @@ class ShopController extends Controller
 
         $cart = Cart::create([
             'user_id'    => $user->id,
+<<<<<<< HEAD
             'quantity'   => $request->quantity,
             'product_id' => $request->product_id,
             'total'      => floatval($product->price) * intval($request->quantity),
             'status'     => 'pending',
+=======
+            'product_id' => $request->product_id,
+            'quantity'   => $request->quantity,
+            'total'      => $product->price * $request->quantity,
+            'status'     => 'pending'
+>>>>>>> b72102445d6da729602f0c0ea850cc8c9f12f57c
         ]);
 
         return response()->json([
@@ -233,6 +249,7 @@ class ShopController extends Controller
         return response()->json([
             'cartItems' => $cartItems
         ], 200);
+<<<<<<< HEAD
 
 
         }catch(\Exception $e){
@@ -248,5 +265,7 @@ class ShopController extends Controller
             ], 404);
         }
         
+=======
+>>>>>>> b72102445d6da729602f0c0ea850cc8c9f12f57c
     }
 }
