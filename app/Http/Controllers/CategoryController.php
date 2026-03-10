@@ -2,142 +2,96 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Category;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
     // Get all categories
     public function index()
     {
-        try {
-            $categories = Category::withCount('products')->get();
+        $categories = Category::with('products')->get();
 
-            return response()->json([
-                'success' => true,
-                'categories' => $categories
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error('Fetch categories failed: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch categories'
-            ], 500);
-        }
+        return response()->json($categories);
     }
 
-    // Create category
+    // Store a new category
     public function store(Request $request)
     {
-        try {
+        $request->validate([
+            'category_name' => 'required|string|max:255',
+            'description' => 'nullable|string'
+        ]);
 
-            $request->validate([
-                'category_name' => 'required|string|max:255|unique:categories,category_name',
-                'description' => 'nullable|string'
-            ]);
+        $category = Category::create([
+            'category_name' => $request->category_name,
+            'description' => $request->description
+        ]);
 
-            $category = Category::create([
-                'category_name' => $request->category_name,
-                'description' => $request->description
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Category created successfully',
-                'category' => $category
-            ], 201);
-
-        } catch (\Exception $e) {
-
-            Log::error('Create category failed: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create category'
-            ], 500);
-        }
+        return response()->json([
+            'message' => 'Category created successfully',
+            'data' => $category
+        ], 201);
     }
 
-    // Show single category
+    // Get a single category
     public function show($id)
     {
-        try {
+        $category = Category::with('products')
+            ->where('category_id', $id)
+            ->first();
 
-            $category = Category::with('products')->findOrFail($id);
-
+        if (!$category) {
             return response()->json([
-                'success' => true,
-                'category' => $category
-            ], 200);
-
-        } catch (\Exception $e) {
-
-            return response()->json([
-                'success' => false,
                 'message' => 'Category not found'
             ], 404);
         }
+
+        return response()->json($category);
     }
 
-    // Update category
+    // Update a category
     public function update(Request $request, $id)
     {
-        try {
+        $category = Category::where('category_id', $id)->first();
 
-            $category = Category::findOrFail($id);
-
-            $request->validate([
-                'category_name' => 'required|string|max:255|unique:categories,category_name,' . $id . ',category_id',
-                'description' => 'nullable|string'
-            ]);
-
-            $category->update([
-                'category_name' => $request->category_name,
-                'description' => $request->description
-            ]);
-
+        if (!$category) {
             return response()->json([
-                'success' => true,
-                'message' => 'Category updated successfully',
-                'category' => $category
-            ], 200);
-
-        } catch (\Exception $e) {
-
-            Log::error('Update category failed: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update category'
-            ], 500);
+                'message' => 'Category not found'
+            ], 404);
         }
+
+        $request->validate([
+            'category_name' => 'sometimes|string|max:255',
+            'description' => 'nullable|string'
+        ]);
+
+        $category->update($request->only([
+            'category_name',
+            'description'
+        ]));
+
+        return response()->json([
+            'message' => 'Category updated successfully',
+            'data' => $category
+        ]);
     }
 
-    // Delete category
+    // Delete a category
     public function destroy($id)
     {
-        try {
+        $category = Category::where('category_id', $id)->first();
 
-            $category = Category::findOrFail($id);
-
-            $category->delete();
-
+        if (!$category) {
             return response()->json([
-                'success' => true,
-                'message' => 'Category deleted successfully'
-            ], 200);
-
-        } catch (\Exception $e) {
-
-            Log::error('Delete category failed: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete category'
-            ], 500);
+                'message' => 'Category not found'
+            ], 404);
         }
+
+        $category->delete();
+
+        return response()->json([
+            'message' => 'Category deleted successfully'
+        ]);
     }
 }

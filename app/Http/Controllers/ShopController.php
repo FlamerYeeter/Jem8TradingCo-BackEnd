@@ -11,53 +11,34 @@ class ShopController extends Controller
 {
     // gawin nyo nalang yung mga nasa list jan
     // Add product to cart
-public function addToCart(Request $request)
-{
-    // Use auth() helper instead of $request->user() for reliability
-    $user = auth('sanctum')->user();
+    public function addToCart(Request $request)
+    {
+        $user = $request->user();
 
-    if (!$user) {
-        \Log::warning('Cart add failed – no authenticated user', ['ip' => $request->ip()]);
-        return response()->json(['message' => 'Unauthorized – please log in'], 401);
-    }
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
-    // Validate request
-    $request->validate([
-        'quantity'   => 'required|integer|min:1',
-        'product_id' => 'required|integer|exists:products,product_id',
-    ]);
+        $request->validate([
+            'quantity'   => 'required|integer|min:1',
+            'product_id' => 'required|integer|exists:products,product_id'
+        ]);
 
-    // Find product
-    $product = Product::find($request->product_id);
-    if (!$product) {
-        \Log::warning("Cart add failed – product_id {$request->product_id} not found");
-        return response()->json(['message' => 'Product not found'], 404);
-    }
+        $product = Product::find($request->product_id);
 
-    try {
-        // Create or update cart item
-        $cart = Cart::updateOrCreate(
-            [
-                'user_id'    => $user->id,
-                'product_id' => $product->product_id,
-                'status'     => 'pending',
-            ],
-            [
-                'quantity' => $request->quantity,
-                'total'    => $product->price * $request->quantity,
-            ]
-        );
+        $cart = Cart::create([
+            'user_id'    => $user->id,
+            'product_id' => $request->product_id,
+            'quantity'   => $request->quantity,
+            'total'      => $product->price * $request->quantity,
+            'status'     => 'pending'
+        ]);
 
         return response()->json([
             'message' => 'Product added to cart successfully',
-            'cart'    => $cart,
+            'cart'    => $cart
         ], 201);
-
-    } catch (\Exception $e) {
-        \Log::error('Cart add failed: ' . $e->getMessage());
-        return response()->json(['message' => 'Failed to add product to cart'], 500);
     }
-}
 
     public function addProduct(Request $request)
     {
@@ -157,7 +138,6 @@ public function addToCart(Request $request)
         return response()->json([
             'cartItems' => $cartItems
         ], 200);
-
     }
 
 
