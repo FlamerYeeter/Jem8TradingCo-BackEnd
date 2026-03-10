@@ -45,7 +45,7 @@ class AdminLeadershipController extends Controller
                 'user_id'       => 'required|exists:users,id',
                 'position'      => 'required|string|max:255',
                 'status'        => 'required|in:active,inactive',
-                'leadership_img'=> 'required|image|mimes:jpeg,png,jpg|max:2048',
+                'leadership_img'=> 'required|image|mimes:j  peg,png,jpg|max:2048',
             ]);
 
             // Handle image upload
@@ -84,6 +84,9 @@ class AdminLeadershipController extends Controller
 
     public function adminImgUpdate(Request $request, $id){
         try {
+
+            
+
             $leadership = admin_leadership::findOrFail($id);
 
             $request->validate([
@@ -93,17 +96,20 @@ class AdminLeadershipController extends Controller
                 'leadership_img'=> 'sometimes|image|mimes:jpeg,png,jpg|max:2048',
             ]);
 
+
+            $data = $request->only(['user_id','position','status']);
+
             if ($request->hasFile('leadership_img')) {
                 // Delete old image if exists
                 if ($leadership->leadership_img) {
                     \Storage::disk('public')->delete($leadership->leadership_img);
                 }
                 // Store new image
-                $imagePath = $request->file('leadership_img')->store('leadership_imgs', 'public');
-                $leadership->leadership_img = $imagePath;
+                $data['leadership_img'] = $request->file('leadership_img') 
+                -> store('leadership_imgs','public');
             }
 
-            $leadership->update($request->only(['user_id', 'position', 'status']));
+            $leadership->update($data);
 
             return response()->json([
                 'status' => 'success',
@@ -163,5 +169,8 @@ class AdminLeadershipController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
-    }   
+    }
+    
+
+
 }
