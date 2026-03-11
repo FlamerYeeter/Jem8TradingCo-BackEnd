@@ -22,7 +22,7 @@ return new class extends Migration
             $table->unsignedBigInteger('cart_id');
             $table->unsignedBigInteger('discount_id')->nullable();
             $table->string('payment_method', 255);
-            $table->string('payment_reference', 255)->nullable();
+            $table->json('payment_details')->nullable();
             $table->double('shipping_fee')->default(0);
             $table->double('paid_amount')->default(0);
             $table->double('paid_at')->nullable();
