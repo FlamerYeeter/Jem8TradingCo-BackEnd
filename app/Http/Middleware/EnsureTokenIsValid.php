@@ -22,6 +22,13 @@ class EnsureTokenIsValid
     }
     public function handle(Request $request, Closure $next)
     {
+
+        // If session-based authentication (cookie + Sanctum) is present, allow it.
+        if (auth()->check() || $request->user()) {
+            return $next($request);
+        }
+
+        // Fallback to token stored in cookie named 'jem8_token'
         $token = $request->cookie('jem8_token');
 
         if (!$token) {
@@ -40,7 +47,7 @@ class EnsureTokenIsValid
             ], 401);
         }
 
-        // Set authenticated user
+        // Set authenticated user from personal access token
         auth()->setUser($accessToken->tokenable);
 
         return $next($request);

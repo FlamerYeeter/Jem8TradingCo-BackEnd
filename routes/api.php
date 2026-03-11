@@ -101,7 +101,17 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/addresses/{id}', [UserAddressController::class, 'show']);
     Route::put('/addresses/{id}', [UserAddressController::class, 'update']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
+
+    // Chat
+    
 });
+
+// Routes using cookie/session authentication for SPA (Sanctum)
+Route::middleware(['web','auth:sanctum'])->group(function () {
+    Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+    Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
+});
+
 Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/admin/contacts',              [ContactController::class, 'index']);
     Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
