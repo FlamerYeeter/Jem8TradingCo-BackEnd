@@ -165,6 +165,27 @@ class AccountController extends Controller
         return response()->json(['message' => 'Email verified successfully']);
     }
 
+    public function show($id)
+    {
+        try {
+
+            $account = Account::findOrFail($id);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $account
+            ], 200);
+
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Account not found'
+            ], 404);
+
+        }
+    }
+
     // ==============================
     // FORGOT PASSWORD
     // ==============================

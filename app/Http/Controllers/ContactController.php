@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Contact;
-
+use Illuminate\Support\Facades\Mail;
+use App\Mail\ContactReply;
 class ContactController extends Controller
 {
     // Create a new contact message (public)

@@ -31,8 +31,10 @@ Route::get('/reviews/{review}', [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::post('/contact', [ContactController::class, 'store']);
+Route::get('/findaccount/{id}', [AccountController::class, 'show']);
 // Routes that require authentication
 Route::middleware([EnsureTokenIsValid::class])->group(function () {
+
 
     // Account
     Route::get('/me', [AccountController::class, 'me']);
