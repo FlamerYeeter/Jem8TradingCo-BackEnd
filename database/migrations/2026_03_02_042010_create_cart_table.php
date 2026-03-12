@@ -19,6 +19,7 @@ return new class extends Migration
             $table->integer('quantity')->default(1);
             $table->decimal('total', 10, 2);
             $table->string('status')->default('pending'); // pending, completed
+            $table->boolean('is_checkout')->default(false);
             $table->timestamps();
 
             // foreign keys
