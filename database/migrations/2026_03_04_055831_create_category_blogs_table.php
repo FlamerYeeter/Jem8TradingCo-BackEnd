@@ -8,8 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::disableForeignKeyConstraints();
-        if(Schema::hasTable('category_blog')){
+        
             Schema::create('category_blog', function (Blueprint $table) {
                 $table->id('category_blog_id');
                 $table->string('category_name', 255);
@@ -17,8 +16,7 @@ return new class extends Migration
                 $table->string('img', 255)->nullable();
                 $table->timestamps();
             });
-        }
-        Schema::enableForeignKeyConstraints();
+        
     }
 
     public function down(): void

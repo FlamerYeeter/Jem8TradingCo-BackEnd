@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Contact;
-use App\Mail\ContactReply;
-
 
 class ContactController extends Controller
 {
@@ -126,36 +124,36 @@ class ContactController extends Controller
         }
     }
     public function reply(Request $request, $id)
-    {
-        try {
-            $request->validate([
-                'reply_message' => 'required|string|max:2000',
-            ]);
+{
+    try {
+        $request->validate([
+            'reply_message' => 'required|string|max:2000',
+        ]);
 
-            $contact = Contact::findOrFail($id);
+        $contact = Contact::findOrFail($id);
 
-            // Send email
-            Mail::to($contact->email)->send(
-                new ContactReply(
-                    $contact->first_name . ' ' . $contact->last_name,
-                    $request->input('reply_message')
-                )
-            );
+        // Send email
+        Mail::to($contact->email)->send(
+            new ContactReply(
+                $contact->first_name . ' ' . $contact->last_name,
+                $request->input('reply_message')
+            )
+        );
 
-            // Auto update status to replied
-            $contact->update(['status' => 'replied']);
+        // Auto update status to replied
+        $contact->update(['status' => 'replied']);
 
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Reply sent successfully to ' . $contact->email,
-                'data'    => $contact,
-            ], 200);
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Reply sent successfully to ' . $contact->email,
+            'data'    => $contact,
+        ], 200);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
     }
+}
 }
