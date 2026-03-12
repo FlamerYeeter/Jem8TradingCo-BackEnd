@@ -85,6 +85,8 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::patch('/reviews/{review}', [ReviewController::class, 'update']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 
+    //checkout
+    Route::get('/checkout', [CheckoutController::class, 'index']);
     // Cart
     // Route::get('/cart', [CartController::class, 'index']);
     // Route::post('/cart', [CartController::class, 'store']);
