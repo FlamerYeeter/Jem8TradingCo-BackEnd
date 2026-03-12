@@ -38,8 +38,10 @@ Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
 
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::post('/contact', [ContactController::class, 'store']);
+Route::get('/findaccount/{id}', [AccountController::class, 'show']);
 // Routes that require authentication
 Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
+
 
 
     // Account
@@ -97,6 +99,8 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     Route::patch('/reviews/{review}', [ReviewController::class, 'update']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 
+    //checkout
+    Route::get('/checkout', [CheckoutController::class, 'index']);
     // Cart
     Route::post('/cart/add', [ShopController::class, 'addToCart']);
     Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
@@ -114,6 +118,7 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     Route::put('/addresses/{id}', [UserAddressController::class, 'update']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
 
+<<<<<<< HEAD
 
     //prods
     Route::post('/products', [ShopController::class, 'addProduct']);
@@ -148,4 +153,22 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
         Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
         Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
     });
+=======
+    // Chat
+    
+});
+
+// Routes using cookie/session authentication for SPA (Sanctum)
+Route::middleware(['web','auth:sanctum'])->group(function () {
+    Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+    Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
+});
+
+Route::middleware([EnsureTokenIsValid::class])->group(function () {
+    Route::get('/admin/contacts',              [ContactController::class, 'index']);
+    Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
+    Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
+    Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
+    Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+>>>>>>> c681468574960909dc386ae5e8fcd8f75250f260
 });
