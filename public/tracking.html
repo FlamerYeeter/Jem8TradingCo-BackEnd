@@ -14,8 +14,11 @@
     <button id="simulate">Simulate POST</button>
   </div>
   <div style="padding:8px;display:flex;gap:8px;align-items:center;">
-    <input id="createAddress" placeholder="Enter destination address (user house)" style="width:420px" />
+    <input id="createAddress" placeholder="Enter destination address (user house)" style="width:360px" />
+    <input id="createLat" placeholder="lat (optional)" style="width:120px" />
+    <input id="createLng" placeholder="lng (optional)" style="width:120px" />
     <button id="createTrip">Create Trip (geocode & save)</button>
+    <div id="createStatus" style="margin-left:8px;font-weight:600"></div>
   </div>
   <div id="map"></div>
   <div style="padding:8px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; background:#fff">
@@ -99,21 +102,29 @@
         }
 
         const remMeters = haversine(latlng, [destLat, destLng]);
-        let etaSeconds = fallbackMin * 60;
-        if(speed && speed > 0.1){
-          etaSeconds = remMeters / speed;
+        // Use reported speed when available and reasonable, otherwise use an assumed travel speed (m/s)
+        const ASSUMED_SPEED = 8.0; // m/s (~28.8 km/h) good default for urban driving estimates
+        let usedSpeed = null;
+        let usedAssumption = false;
+        if(speed && speed > 0.5){
+          usedSpeed = speed;
+        } else {
+          // try to infer from recent last point in poly (approximate)
+          usedSpeed = ASSUMED_SPEED;
+          usedAssumption = true;
         }
-        // clamp eta to [0, fallback]
-        etaSeconds = Math.max(0, Math.min(etaSeconds, fallbackMin * 60));
+
+        let etaSeconds = remMeters / Math.max(0.1, usedSpeed);
         const etaDate = new Date(Date.now() + Math.round(etaSeconds*1000));
 
         // Display
         const minutesLeft = Math.ceil(etaSeconds/60);
         document.getElementById('etaBadge').innerText = 'ETA: ' + etaDate.toLocaleTimeString();
-        document.getElementById('minutesLeft').innerText = minutesLeft + ' min';
-        const pct = Math.round((1 - (etaSeconds / (fallbackMin*60))) * 100);
+        document.getElementById('minutesLeft').innerText = minutesLeft + ' min' + (usedAssumption ? ' (est)' : '');
+        // progress: show how much of fallback has elapsed (0..100)
+        const pct = Math.round(Math.min(100, (1 - (etaSeconds / (fallbackMin*60))) * 100));
         document.getElementById('etaProgress').style.width = pct + '%';
-        document.getElementById('meta').innerText = 'Speed: ' + (speed? speed.toFixed(2) : '—') + ' m/s · Accuracy: ' + (e.accuracy || e.location?.accuracy || '—') + ' m';
+        document.getElementById('meta').innerText = 'Speed: ' + (usedSpeed? usedSpeed.toFixed(2) : '—') + ' m/s' + (usedAssumption ? ' (assumed)' : '') + ' · Accuracy: ' + (e.accuracy || e.location?.accuracy || '—') + ' m';
       });
 
       // Load trip info and recent points once
@@ -151,24 +162,36 @@
       log('Connected to trip.' + trip);
     });
 
-    // Create trip by geocoding address and saving to server
+    // Create trip by geocoding address or using manual coords and saving to server
     document.getElementById('createTrip').addEventListener('click', async () => {
       const trip = document.getElementById('trip').value.trim();
       const address = document.getElementById('createAddress').value.trim();
+      const manualLat = document.getElementById('createLat').value.trim();
+      const manualLng = document.getElementById('createLng').value.trim();
       if(!trip) return alert('Enter trip id');
-      if(!address) return alert('Enter an address');
 
-      log('Geocoding: ' + address);
+      const st = document.getElementById('createStatus');
+
       try{
-        const q = encodeURIComponent(address);
-        const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + q, {headers:{'Accept':'application/json'}});
-        const results = await r.json();
-        if(!results || results.length === 0) return alert('Address not found');
-        const place = results[0];
-        const lat = parseFloat(place.lat);
-        const lon = parseFloat(place.lon);
+        let lat, lon;
+        if(manualLat && manualLng){
+          lat = parseFloat(manualLat);
+          lon = parseFloat(manualLng);
+          if(Number.isNaN(lat) || Number.isNaN(lon)) throw new Error('Invalid coordinates');
+        } else {
+          if(!address) return alert('Enter an address or provide lat/lng');
+          log('Geocoding: ' + address);
+          const q = encodeURIComponent(address);
+          const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + q, {headers:{'Accept':'application/json'}});
+          const results = await r.json();
+          if(!results || results.length === 0) return alert('Address not found');
+          const place = results[0];
+          lat = parseFloat(place.lat);
+          lon = parseFloat(place.lon);
+        }
+
         // Save trip to server
-        const payload = { trip_id: trip, start_lat: START_LAT, start_lng: START_LNG, dest_lat: lat, dest_lng: lon, dest_address: address };
+        const payload = { trip_id: trip, start_lat: START_LAT, start_lng: START_LNG, dest_lat: lat, dest_lng: lon, dest_address: address || null };
         const save = await fetch('/api/public/trips', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
         const js = await save.json();
         if(!save.ok) throw js;
@@ -176,9 +199,13 @@
         // update inputs
         document.getElementById('destLat').value = lat;
         document.getElementById('destLng').value = lon;
-        alert('Trip saved and destination set');
+        // show success indicator
+        st.innerText = 'Saved ✓'; st.style.color = '#059669';
+        setTimeout(()=>{ st.innerText=''; }, 6000);
       } catch(err){
         console.error(err);
+        st.innerText = 'Failed ✕'; st.style.color = '#dc2626';
+        setTimeout(()=>{ st.innerText=''; }, 6000);
         alert('Failed to create trip: ' + (err?.message || err));
       }
     });

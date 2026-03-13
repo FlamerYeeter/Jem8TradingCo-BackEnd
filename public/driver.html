@@ -16,6 +16,13 @@
     <button id="start">Start</button>
     <button id="stop" disabled>Stop</button>
   </div>
+  <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+    <input id="createAddressDriver" placeholder="Enter destination address (user house)" style="width:260px" />
+    <input id="createLatDriver" placeholder="lat (optional)" style="width:120px" />
+    <input id="createLngDriver" placeholder="lng (optional)" style="width:120px" />
+    <button id="createTripDriver">Create Trip (geocode & save)</button>
+    <div id="createStatusDriver" style="margin-left:8px;font-weight:600"></div>
+  </div>
 
   <div id="status" style="margin-top:8px;font-weight:600">Status: idle</div>
   <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
@@ -98,6 +105,52 @@
         }
       } catch(e){}
 
+      // wire up driver-side create trip button if pressed before start
+      document.getElementById('createTripDriver').addEventListener('click', async () => {
+        const tripId = document.getElementById('trip').value.trim();
+        const address = document.getElementById('createAddressDriver').value.trim();
+        const manualLat = document.getElementById('createLatDriver').value.trim();
+        const manualLng = document.getElementById('createLngDriver').value.trim();
+        if(!tripId) return alert('Enter trip id');
+        const st = document.getElementById('createStatusDriver');
+        try{
+          let lat, lon;
+          if(manualLat && manualLng){
+            lat = parseFloat(manualLat);
+            lon = parseFloat(manualLng);
+            if(Number.isNaN(lat) || Number.isNaN(lon)) throw new Error('Invalid coordinates');
+          } else {
+            if(!address) return alert('Enter an address or provide lat/lng');
+            log('Geocoding: ' + address);
+            const q = encodeURIComponent(address);
+            const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + q, {headers:{'Accept':'application/json'}});
+            const results = await r.json();
+            if(!results || results.length === 0) return alert('Address not found');
+            const place = results[0];
+            lat = parseFloat(place.lat);
+            lon = parseFloat(place.lon);
+          }
+
+          const start_lat = lastPos?.lat || null;
+          const start_lng = lastPos?.lng || null;
+          const payload = { trip_id: tripId, start_lat: start_lat, start_lng: start_lng, dest_lat: lat, dest_lng: lon, dest_address: address || null };
+          const save = await fetch('/api/public/trips', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+          const js = await save.json();
+          if(!save.ok) throw js;
+          log('Trip created: ' + JSON.stringify(js.trip));
+          document.getElementById('destLat').value = lat;
+          document.getElementById('destLng').value = lon;
+          st.innerText = 'Saved ✓'; st.style.color = '#059669';
+          setTimeout(()=>{ st.innerText=''; }, 6000);
+          alert('Trip saved and destination set');
+        } catch(err){
+          console.error(err);
+          st.innerText = 'Failed ✕'; st.style.color = '#dc2626';
+          setTimeout(()=>{ st.innerText=''; }, 6000);
+          alert('Failed to create trip: ' + (err?.message || err));
+        }
+      });
+
       if(!('geolocation' in navigator)){
         alert('Geolocation not supported');
         return;
@@ -171,11 +224,12 @@
             const destLng = parseFloat(document.getElementById('destLng').value) || lng;
             const fallbackMin = parseFloat(document.getElementById('fallback').value) || 30;
             const rem = haversine({lat,lng},{lat:destLat,lng:destLng});
-            let etaSeconds = fallbackMin * 60;
-            if(speed && speed > 0.1) etaSeconds = rem / speed;
-            etaSeconds = Math.max(0, Math.min(etaSeconds, fallbackMin * 60));
+            const ASSUMED_SPEED = 8.0; // m/s
+            let usedSpeed = (speed && speed > 0.5) ? speed : ASSUMED_SPEED;
+            const usedAssumption = !(speed && speed > 0.5);
+            let etaSeconds = rem / Math.max(0.1, usedSpeed);
             const minutesLeft = Math.ceil(etaSeconds/60);
-            document.getElementById('etaDriver').innerText = 'Arrive ~ ' + new Date(Date.now() + etaSeconds*1000).toLocaleTimeString();
+            document.getElementById('etaDriver').innerText = 'Arrive ~ ' + new Date(Date.now() + etaSeconds*1000).toLocaleTimeString() + (usedAssumption ? ' (est)' : '');
             document.getElementById('minutesLeftDriver').innerText = minutesLeft + ' min';
           } catch(e){/* ignore */}
         }
