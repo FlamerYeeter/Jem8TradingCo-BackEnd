@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
         if (!Schema::hasTable('abouts')) {
         Schema::create('abouts', function (Blueprint $table) {
             $table->id('about_id');
@@ -26,6 +27,7 @@ return new class extends Migration
                   ->onDelete('cascade');
             });
         }
+        Schema::enableForeignKeyConstraints();
     }
 
     /**

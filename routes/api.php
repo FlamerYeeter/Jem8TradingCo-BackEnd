@@ -4,6 +4,8 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\AdminLeadershipController;
+use App\Http\Controllers\AdminBackupController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use Illuminate\Http\Request;
@@ -25,17 +27,23 @@ Route::post('/verify', [AccountController::class, 'verifyEmail']);
 Route::post('/forgot-password', [AccountController::class, 'forgotPassword']);
 Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 
-Route::get('/products/{id}', [ShopController::class, 'showProduct']);
 
 // Reviews (public)
 Route::get('/reviews', [ReviewController::class, 'all']);
 Route::get('/reviews/{review}', [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
+
+//Prods
+
+
+
+
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::post('/contact', [ContactController::class, 'store']);
 Route::get('/findaccount/{id}', [AccountController::class, 'show']);
 // Routes that require authentication
-Route::middleware([EnsureTokenIsValid::class])->group(function () {
+Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
+
 
 
     // Account
@@ -61,6 +69,12 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     });
 
     // Shop
+    // Route::get('/products', [ShopController::class, 'index']);
+    // Route::get('/products/category/{category}', [ShopController::class, 'productsByCategory']);
+    // Route::post('/products', [ShopController::class, 'addProduct']);
+    // Route::put('/products/{id}', [ShopController::class, 'updateProduct']);
+    
+    //
     //Hello
     Route::post('/cart/add', [ShopController::class, 'addToCart']);
     Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
@@ -90,16 +104,14 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     //checkout
     Route::get('/checkout', [CheckoutController::class, 'index']);
     // Cart
-    // Route::get('/cart', [CartController::class, 'index']);
-    // Route::post('/cart', [CartController::class, 'store']);
-    // Route::put('/cart/{cart}', [CartController::class, 'update']);
-    // Route::patch('/cart/{cart}', [CartController::class, 'update']);
-    // Route::delete('/cart/{cart}', [CartController::class, 'destroy']);
-    // Route::delete('/cart/product/{product}', [CartController::class, 'destroyByProduct']);
-    // Route::post('/cart/clear', [CartController::class, 'clear']);
+    Route::post('/cart/add', [ShopController::class, 'addToCart']);
+    Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
+    Route::put('/cart/{id}', [ShopController::class, 'updateCartQuantity']);
+    Route::get('/products/{id}', [ShopController::class, 'showProduct']);
+
 
     // Checkout
-    Route::post('/checkout', [CheckoutController::class, 'store']);
+    
 
     // Location tracking
     Route::post('/locations', [LocationController::class, 'store']);
@@ -122,20 +134,62 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::put('/addresses/{id}', [UserAddressController::class, 'update']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
 
+
+    //prods
+    Route::post('/products', [ShopController::class, 'addProduct']);
+    Route::put('/products/{id}', [ShopController::class, 'updateProduct']);
+    Route::delete('/products/{id}', [ShopController::class, 'deleteProduct']);
+
+    //admin leadership
+    Route::prefix('admin')->group(function () {
+        Route::get('/imgs',           [AdminLeadershipController::class, 'adminImgIndex']);
+        Route::post('/imgs/store',    [AdminLeadershipController::class, 'adminImgStore']);
+        Route::get('/imgs/{id}',      [AdminLeadershipController::class, 'adminImgShow']);   // fix: was pointing to wrong method
+        Route::put('/imgs/{id}',      [AdminLeadershipController::class, 'adminImgUpdate']);
+        Route::delete('/imgs/{id}',   [AdminLeadershipController::class, 'adminImgDelete']);
+    });
+
+    //admin backup
+    Route::prefix('admin')->group(function () {
+        Route::prefix('backup')->group(function () {
+            Route::get('/',              [AdminBackupController::class, 'adminHistoryBackup']);
+            Route::post('/run',          [AdminBackupController::class, 'adminRunBackup']);
+            Route::get('/download/{id}', [AdminBackupController::class, 'adminDownloadBackup']);
+            Route::delete('/{id}',       [AdminBackupController::class, 'adminDeleteBackup']);
+            Route::post('/restore',      [AdminBackupController::class, 'adminUploadRestore']);
+        });
+    });
+
+
+    Route::middleware([EnsureTokenIsValid::class])->group(function () {
+        Route::get('/admin/contacts',              [ContactController::class, 'index']);
+        Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
+        Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
+        Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
+        Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+    });
     // Chat
+
+
+        // Routes using cookie/session authentication for SPA (Sanctum)
+    Route::middleware(['web','auth:sanctum'])->group(function () {
+        Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+        Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
+    });
+
+    Route::middleware([EnsureTokenIsValid::class])->group(function () {
+        Route::get('/admin/contacts',              [ContactController::class, 'index']);
+        Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
+        Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
+        Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
+        Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+    });
+    
+    //dashboard admin
+    Route::prefix('admin')->group(function(){
+    Route::get('/dashboard',[Dashboard::class, 'index']);
+    });
     
 });
 
-// Routes using cookie/session authentication for SPA (Sanctum)
-Route::middleware(['web','auth:sanctum'])->group(function () {
-    Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
-    Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
-});
 
-Route::middleware([EnsureTokenIsValid::class])->group(function () {
-    Route::get('/admin/contacts',              [ContactController::class, 'index']);
-    Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
-    Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
-    Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
-    Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
-});

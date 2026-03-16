@@ -1,0 +1,270 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\admin_backup;
+
+class AdminBackupController extends Controller
+{
+    // ✅ POST - Run Backup
+    public function adminRunBackup(Request $request)
+    {
+        try {
+            $request->validate([
+                'backup_type' => 'required|integer|in:1,2,3',
+            ]);
+
+            $timestamp = now()->format('Ymd_His');
+            $typeNames = [
+                admin_backup::TYPE_DATABASE => 'db',
+                admin_backup::TYPE_FILES    => 'files',
+                admin_backup::TYPE_FULL     => 'full',
+            ];
+
+            $typeName   = $typeNames[$request->backup_type];
+            $ext        = $request->backup_type == admin_backup::TYPE_DATABASE ? 'sql' : 'zip';
+            $fileName   = "backup_{$typeName}_{$timestamp}.{$ext}";
+            $backupPath = "backups/{$fileName}";
+            $fullPath   = storage_path("app/public/{$backupPath}");
+
+            \Storage::disk('public')->makeDirectory('backups');
+
+            if ($request->backup_type == admin_backup::TYPE_DATABASE) {
+                $this->exportDatabase($fullPath);
+
+            } elseif ($request->backup_type == admin_backup::TYPE_FILES) {
+                $this->exportFiles($fullPath);
+
+            } elseif ($request->backup_type == admin_backup::TYPE_FULL) {
+                $this->exportFull($fullPath);
+            }
+
+            $backup = admin_backup::create([
+                'backup_type' => $request->backup_type,
+                'backup_size' => file_exists($fullPath) ? filesize($fullPath) : 0,
+                'status'      => file_exists($fullPath) ? 'completed' : 'failed',
+                'file_name'   => $fileName,
+                'backup_path' => $backupPath,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => $backup,
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'validation',
+                'message' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'server',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ✅ GET - Backup History
+    public function adminHistoryBackup()
+    {
+        try {
+            $backups = admin_backup::orderBy('created_at', 'desc')->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => $backups,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'server',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ✅ GET - Download Backup
+    public function adminDownloadBackup($id)
+    {
+        try {
+            $backup   = admin_backup::findOrFail($id);
+            $fullPath = storage_path('app/public/' . $backup->backup_path);
+
+            if (!file_exists($fullPath)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Backup file not found'
+                ], 404);
+            }
+
+            return response()->download($fullPath, $backup->file_name);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'not_found',
+                'message' => 'Backup record not found'
+            ], 404);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'server',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ✅ DELETE - Delete Backup
+    public function adminDeleteBackup($id)
+    {
+        try {
+            $backup   = admin_backup::findOrFail($id);
+            $fullPath = storage_path('app/public/' . $backup->backup_path);
+
+            // // Delete file from storage
+            // if (file_exists($fullPath)) {
+            //     unlink($fullPath);
+            // }
+
+            $backup->delete(); // soft delete only
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Backup deleted successfully'
+            ], 200);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'not_found',
+                'message' => 'Backup record not found'
+            ], 404);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'server',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ✅ POST - Upload & Restore
+    public function adminUploadRestore(Request $request)
+    {
+        try {
+            $request->validate([
+                'backup_file' => 'required|file|mimes:txt,zip,x-sql|max:51200',
+            ]);
+
+            $file     = $request->file('backup_file');
+            $fullPath = storage_path('app/public/backups/' . $file->getClientOriginalName());
+
+            $file->move(storage_path('app/public/backups'), $file->getClientOriginalName());
+
+            // Restore DB from SQL file
+            if ($file->getClientOriginalExtension() == 'sql') {
+                $db       = config('database.connections.mysql.database');
+                $user     = config('database.connections.mysql.username');
+                $password = config('database.connections.mysql.password');
+                $host     = config('database.connections.mysql.host');
+
+                $pdo = new \PDO("mysql:host={$host};dbname={$db}", $user, $password);
+                $sql = file_get_contents($fullPath);
+                $pdo->exec($sql);
+            }
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Backup restored successfully'
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'validation',
+                'message' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'type'    => 'server',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ✅ Private - Export DB using PDO
+    private function exportDatabase($fullPath)
+    {
+        
+    $db       = config('database.connections.mysql.database');
+    $user     = config('database.connections.mysql.username');
+    $password = config('database.connections.mysql.password');
+    $host     = config('database.connections.mysql.host');
+
+    // ✅ Use full path to mysqldump directly
+    $mysqldump = 'C:\\xampp\\mysql\\bin\\mysqldump';
+
+    exec("{$mysqldump} --user={$user} --password={$password} --host={$host} {$db} -r \"{$fullPath}\"");
+    }
+
+    // ✅ Private - Export Files as ZIP
+    private function exportFiles($fullPath)
+    {
+        $zip    = new \ZipArchive();
+        $source = storage_path('app/public');
+
+        if ($zip->open($fullPath, \ZipArchive::CREATE) === true) {
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($source)
+            );
+            foreach ($files as $file) {
+                if (!$file->isDir()) {
+                    $zip->addFile(
+                        $file->getPathname(),
+                        str_replace($source . DIRECTORY_SEPARATOR, '', $file->getPathname())
+                    );
+                }
+            }
+            $zip->close();
+        }
+    }
+
+    // ✅ Private - Export Full (DB + Files)
+    private function exportFull($fullPath)
+    {
+        $zip     = new \ZipArchive();
+        $source  = storage_path('app/public');
+        $tempSql = storage_path('app/public/backups/temp_db.sql');
+
+        $this->exportDatabase($tempSql);
+
+        if ($zip->open($fullPath, \ZipArchive::CREATE) === true) {
+            $zip->addFile($tempSql, 'database.sql');
+
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($source)
+            );
+            foreach ($files as $file) {
+                if (!$file->isDir()) {
+                    $zip->addFile(
+                        $file->getPathname(),
+                        str_replace($source . DIRECTORY_SEPARATOR, '', $file->getPathname())
+                    );
+                }
+            }
+            $zip->close();
+        }
+
+        if (file_exists($tempSql)) unlink($tempSql);
+    }
+}

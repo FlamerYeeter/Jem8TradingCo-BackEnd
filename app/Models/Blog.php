@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Blog extends Model
 {
@@ -17,14 +19,13 @@ class Blog extends Model
         'blog_title',
         'blog_text',
         'featured_image',
-        'images',
         'status',
         'update_at',
         'updated_by',
     ];
 
     protected $casts = [
-        'images'    => 'array',
+        
         'update_at' => 'datetime',
     ];
 
@@ -32,5 +33,9 @@ class Blog extends Model
     public function category()
     {
         return $this->belongsTo(CategoryBlog::class, 'category_blog_id', 'category_blog_id');
+    }
+    public function images(): HasMany
+    {
+        return $this->hasMany(BlogImg::class, 'blog_id', 'blog_id');
     }
 }

@@ -36,6 +36,6 @@ class Cart extends Model
     // A cart item belongs to a user
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(Account::class, 'user_id', 'id'); // ✅ use Account model
     }
 }

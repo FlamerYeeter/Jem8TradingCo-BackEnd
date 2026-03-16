@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CategoryBlog;
 use App\Models\Blog;
-
+use App\Models\BlogImg;
 
 
 class BlogController extends Controller
@@ -43,64 +43,72 @@ class BlogController extends Controller
 
     // CREATE BLOG
     public function storeBlog(Request $request)
-    {
-        try{
-                $request->validate([
-                'category_name'    => 'required|string|max:255',
-                'blog_title'       => 'required|string|max:255',
-                'blog_text'        => 'required|string',
-                'featured_image'   => 'nullable|image|max:5120',
-                'images'           => 'nullable|array',
-                'images.*'         => 'image|max:5120',
-                'status'           => 'required|in:draft,published,archived',
-            ]);
+{
+    try {
+        $request->validate([
+            'category_name'  => 'required|string|max:255',
+            'blog_title'     => 'required|string|max:255',
+            'blog_text'      => 'required|string',
+            'featured_image' => 'nullable|image|max:5120',
+            'images'         => 'nullable|array|max:3',   // ✅ max 3 side images
+            'images.*'       => 'image|max:5120',
+            'status'         => 'required|in:draft,published,archived',
+        ]);
 
-            $category =CategoryBlog::firstOrCreate([
-                'category_name' => $request->input('category_name')
-            ]);
-            
-            
-            $data =[
-                'category_blog_id' => $category->category_blog_id,
-                'blog_title'       => $request->blog_title,
-                'blog_text'        => $request->blog_text,
-                'status'           => $request->status,
-            ];
+        $category = CategoryBlog::firstOrCreate([
+            'category_name' => $request->input('category_name')
+        ]);
 
-            if ($request->hasFile('featured_image')) {
-                $data['featured_image'] = $request->file('featured_image')->store('featured_images', 'public');
-            }
+        $data = [
+            'category_blog_id' => $category->category_blog_id,
+            'blog_title'       => $request->blog_title,
+            'blog_text'        => $request->blog_text,
+            'status'           => $request->status,
+        ];
 
-            if ($request->hasFile('images')) {
-                $data['images'] = [];
-                foreach ($request->file('images') as $image) {
-                    $data['images'][] = $image->store('blog_images', 'public');
-                }
-            }
-
-            $blog = Blog::create($data);
-
-            return response()->json([
-                'status'  => 'success',
-                'data'    => $blog,
-            ], 201);
-
-        } catch(\Illuminate\Validation\ValidationException $e){
-            return response()->json([
-                'status' => 'error',
-                'type' => 'validation',
-                'message' => $e->errors()
-            ], 422);
-
-        } catch(\Exception $e){
-            return response()->json([
-                'status' => 'error',
-                'type' => 'server',
-                'message' => $e->getMessage()
-            ], 500);
+        // ✅ Featured image stored on blog table
+        if ($request->hasFile('featured_image')) {
+            $data['featured_image'] = $request->file('featured_image')
+                                        ->store('featured_images', 'public');
         }
 
+        $blog = Blog::create($data);
+
+        // ✅ Side images (max 3) stored in blog_imgs table
+        if ($request->hasFile('images')) {
+            $sideImages = array_slice($request->file('images'), 0, 3); // enforce max 3
+
+            foreach ($sideImages as $index => $image) {
+                $path = $image->store('blog_images', 'public');
+
+                BlogImg::create([
+                    'blog_id' => $blog->blog_id,
+                    'url'     => $path,
+                    'order'   => $index, // 0, 1, 2 → maps to 3 placeholders
+                ]);
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $blog->load('images'),
+        ], 201);
+
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'status'  => 'error',
+            'type'    => 'validation',
+            'message' => $e->errors()
+        ], 422);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status'  => 'error',
+            'type'    => 'server',
+            'message' => $e->getMessage()
+        ], 500);
     }
+}
 
     // GET BLOG BY ID
     public function showAllBlog($id){
@@ -118,7 +126,7 @@ class BlogController extends Controller
             return(response()->json([
                 'status'=>'success',
                 'data'=>$id
-            ],200));
+            ],201));
         }
 
         }catch(\Illuminate\Database\Eloquent\ModelNotFoundException $e){

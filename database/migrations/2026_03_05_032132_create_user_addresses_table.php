@@ -11,32 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
+        
         Schema::create('user_addresses', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('user_id')
-                ->constrained('accounts')
-                ->onDelete('cascade');
-
-            // address type
-            $table->enum('type', ['personal', 'company'])->default('personal');
-
-            // company fields (only used if type = company)
-            $table->string('company_name')->nullable();
-            $table->string('company_role')->nullable();
-            $table->string('company_number')->nullable();
-            $table->string('company_email')->nullable();
-
-            // address details
-            $table->string('street');
-            $table->string('barangay')->nullable();
-            $table->string('city');
-            $table->string('province')->nullable();
-            $table->string('postal_code')->nullable();
-            $table->string('country')->default('Philippines');
-
+            $table->foreignId('user_id')->constrained('accounts')->onDelete('cascade');
+            $table->string('company_name');
+            $table->string('company_role');
+            $table->string('company_number');
+            $table->string('company_email');
+            $table->text('address');
             $table->enum('status', ['active', 'inactive'])->default('active');
-
             $table->timestamps();
         });
     }

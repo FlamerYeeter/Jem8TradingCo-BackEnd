@@ -16,7 +16,6 @@ return new class extends Migration
                 $table->string('blog_title', 255);
                 $table->text('blog_text');
                 $table->string('featured_image', 255)->nullable();
-                $table->text('images')->nullable();
                 $table->enum('status', ['draft', 'published', 'archived']);
                 $table->dateTime('update_at')->nullable();
                 $table->string('updated_by', 100)->nullable();

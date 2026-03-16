@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        
         if (!Schema::hasTable('blog_imgs')) {
         Schema::create('blog_imgs', function (Blueprint $table) {
             $table->id();
@@ -18,6 +19,7 @@ return new class extends Migration
             $table->timestamps();
         });
         }
+        
     }
 
     public function down(): void

@@ -13,6 +13,7 @@ class BlogImg extends Model
         'alt_text',
         'order',
     ];
+    
 
     public function blog(): BelongsTo
     {

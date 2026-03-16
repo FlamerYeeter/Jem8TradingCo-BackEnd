@@ -35,9 +35,9 @@ return new class extends Migration
                   ->onDelete('cascade');
 
             $table->foreign('cart_id')
-                  ->references('cart_id')
-                  ->on('carts')
-                  ->onDelete('cascade');
+                ->references('cart_id')
+                ->on('cart')
+                ->onDelete('cascade');
 
             $table->foreign('discount_id')
                   ->references('discount_id')
