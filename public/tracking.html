@@ -1,0 +1,229 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Live Tracking Demo</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>body,html{height:100%;margin:0}#map{height:80vh}#log{height:20vh;overflow:auto;padding:8px;font-family:monospace;background:#f7f7f7}</style>
+</head>
+<body>
+  <div style="padding:8px;display:flex;gap:8px;align-items:center;">
+    <label>Trip ID: <input id="trip" value="makati-start" /></label>
+    <button id="connect">Connect</button>
+    <button id="simulate">Simulate POST</button>
+  </div>
+  <div style="padding:8px;display:flex;gap:8px;align-items:center;">
+    <input id="createAddress" placeholder="Enter destination address (user house)" style="width:360px" />
+    <input id="createLat" placeholder="lat (optional)" style="width:120px" />
+    <input id="createLng" placeholder="lng (optional)" style="width:120px" />
+    <button id="createTrip">Create Trip (geocode & save)</button>
+    <div id="createStatus" style="margin-left:8px;font-weight:600"></div>
+  </div>
+  <div id="map"></div>
+  <div style="padding:8px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; background:#fff">
+    <div style="display:flex;gap:8px;align-items:center">
+      <label>Destination Lat: <input id="destLat" value="14.5546" style="width:120px" /></label>
+      <label>Lng: <input id="destLng" value="121.0244" style="width:120px" /></label>
+      <label>Fallback (min): <input id="fallback" value="30" style="width:60px" /></label>
+    </div>
+    <div style="margin-left:auto; text-align:right">
+      <div id="etaBadge" style="font-size:18px;font-weight:700;color:#1f2937">ETA: —</div>
+      <div id="minutesLeft" style="font-size:28px;font-weight:800;color:#059669">— min</div>
+      <div style="width:220px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-top:6px">
+        <div id="etaProgress" style="height:10px;width:0%;background:#0369a1"></div>
+      </div>
+      <div id="meta" style="font-size:12px;color:#374151;margin-top:6px">Speed: — m/s · Accuracy: — m</div>
+    </div>
+  </div>
+  <div id="log" style="padding:8px;height:18vh;overflow:auto;background:#f7f7f7;font-family:monospace"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.11.0/dist/echo.iife.js"></script>
+
+  <script>
+    const logEl = document.getElementById('log');
+    function log(s){ logEl.innerText = new Date().toISOString() + ' - ' + s + '\n' + logEl.innerText }
+
+    // Simple Leaflet map (starting at H268+6V Makati City ≈ 14.5546, 121.0244)
+    const START_LAT = 14.5546;
+    const START_LNG = 121.0244;
+    const map = L.map('map').setView([START_LAT, START_LNG], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    let marker = null;
+    let poly = L.polyline([], {color: 'blue'}).addTo(map);
+
+    let echo = null;
+
+    document.getElementById('connect').addEventListener('click', () => {
+      const trip = document.getElementById('trip').value.trim();
+      if(!trip) return alert('Enter trip id');
+
+      if(echo) echo.disconnect();
+
+      // Configure Echo (Pusher protocol) to connect to local laravel-echo-server
+      echo = new window.Echo.default({
+        broadcaster: 'pusher',
+        key: 'local',
+        wsHost: window.location.hostname,
+        wsPort: 6001,
+        forceTLS: false,
+        disableStats: true,
+        enabledTransports: ['ws','wss']
+      });
+
+      const channel = echo.channel('trip.' + trip);
+      channel.listen('LocationUpdated', (e) => {
+        log('LocationUpdated received: ' + JSON.stringify(e));
+        const lat = e.lat || e.location?.lat || e.location?.lat;
+        const lng = e.lng || e.location?.lng || e.location?.lng;
+        const speed = e.speed || e.location?.speed || null; // m/s
+        const ts = e.created_at ? new Date(e.created_at).getTime() : Date.now();
+        if(!lat || !lng) return;
+        const latlng = [parseFloat(lat), parseFloat(lng)];
+        poly.addLatLng(latlng);
+        if(!marker) marker = L.marker(latlng).addTo(map);
+        else marker.setLatLng(latlng);
+        map.panTo(latlng);
+
+        // ETA calculation
+        const destLat = parseFloat(document.getElementById('destLat').value) || START_LAT;
+        const destLng = parseFloat(document.getElementById('destLng').value) || START_LNG;
+        const fallbackMin = parseFloat(document.getElementById('fallback').value) || 30;
+
+        function haversine(a,b){
+          const R=6371000; const toRad=v=>v*Math.PI/180;
+          const dLat=toRad(b[0]-a[0]); const dLon=toRad(b[1]-a[1]);
+          const lat1=toRad(a[0]), lat2=toRad(b[0]);
+          const x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+          const c=2*Math.atan2(Math.sqrt(x), Math.sqrt(1-x)); return R*c;
+        }
+
+        const remMeters = haversine(latlng, [destLat, destLng]);
+        // Use reported speed when available and reasonable, otherwise use an assumed travel speed (m/s)
+        const ASSUMED_SPEED = 8.0; // m/s (~28.8 km/h) good default for urban driving estimates
+        let usedSpeed = null;
+        let usedAssumption = false;
+        if(speed && speed > 0.5){
+          usedSpeed = speed;
+        } else {
+          // try to infer from recent last point in poly (approximate)
+          usedSpeed = ASSUMED_SPEED;
+          usedAssumption = true;
+        }
+
+        let etaSeconds = remMeters / Math.max(0.1, usedSpeed);
+        const etaDate = new Date(Date.now() + Math.round(etaSeconds*1000));
+
+        // Display
+        const minutesLeft = Math.ceil(etaSeconds/60);
+        document.getElementById('etaBadge').innerText = 'ETA: ' + etaDate.toLocaleTimeString();
+        document.getElementById('minutesLeft').innerText = minutesLeft + ' min' + (usedAssumption ? ' (est)' : '');
+        // progress: show how much of fallback has elapsed (0..100)
+        const pct = Math.round(Math.min(100, (1 - (etaSeconds / (fallbackMin*60))) * 100));
+        document.getElementById('etaProgress').style.width = pct + '%';
+        document.getElementById('meta').innerText = 'Speed: ' + (usedSpeed? usedSpeed.toFixed(2) : '—') + ' m/s' + (usedAssumption ? ' (assumed)' : '') + ' · Accuracy: ' + (e.accuracy || e.location?.accuracy || '—') + ' m';
+      });
+
+      // Load trip info and recent points once
+      fetch('/api/public/trips/' + trip)
+        .then(r => r.json())
+        .then(json => {
+          if(json.trip){
+            const t = json.trip;
+            if(t.dest_lat && t.dest_lng){
+              document.getElementById('destLat').value = t.dest_lat;
+              document.getElementById('destLng').value = t.dest_lng;
+            }
+            if(t.start_lat && t.start_lng){
+              map.setView([t.start_lat, t.start_lng], 15);
+            }
+          }
+        }).catch(()=>{}).finally(()=>{
+          fetch('/api/public/locations/' + trip + '/recent')
+        .then(r => r.json())
+        .then(json => {
+          log('Loaded recent points: ' + (json.points?.length || 0));
+          if(json.points && json.points.length){
+            const pts = json.points.map(p => [p.lat, p.lng]);
+            poly.setLatLngs(pts);
+            const last = pts[pts.length-1];
+            if(last){
+              if(!marker) marker = L.marker(last).addTo(map);
+              else marker.setLatLng(last);
+              map.fitBounds(poly.getBounds());
+            }
+          }
+        }).catch(err => log('Recent fetch error: ' + err));
+        });
+
+      log('Connected to trip.' + trip);
+    });
+
+    // Create trip by geocoding address or using manual coords and saving to server
+    document.getElementById('createTrip').addEventListener('click', async () => {
+      const trip = document.getElementById('trip').value.trim();
+      const address = document.getElementById('createAddress').value.trim();
+      const manualLat = document.getElementById('createLat').value.trim();
+      const manualLng = document.getElementById('createLng').value.trim();
+      if(!trip) return alert('Enter trip id');
+
+      const st = document.getElementById('createStatus');
+
+      try{
+        let lat, lon;
+        if(manualLat && manualLng){
+          lat = parseFloat(manualLat);
+          lon = parseFloat(manualLng);
+          if(Number.isNaN(lat) || Number.isNaN(lon)) throw new Error('Invalid coordinates');
+        } else {
+          if(!address) return alert('Enter an address or provide lat/lng');
+          log('Geocoding: ' + address);
+          const q = encodeURIComponent(address);
+          const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + q, {headers:{'Accept':'application/json'}});
+          const results = await r.json();
+          if(!results || results.length === 0) return alert('Address not found');
+          const place = results[0];
+          lat = parseFloat(place.lat);
+          lon = parseFloat(place.lon);
+        }
+
+        // Save trip to server
+        const payload = { trip_id: trip, start_lat: START_LAT, start_lng: START_LNG, dest_lat: lat, dest_lng: lon, dest_address: address || null };
+        const save = await fetch('/api/public/trips', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+        const js = await save.json();
+        if(!save.ok) throw js;
+        log('Trip created: ' + JSON.stringify(js.trip));
+        // update inputs
+        document.getElementById('destLat').value = lat;
+        document.getElementById('destLng').value = lon;
+        // show success indicator
+        st.innerText = 'Saved ✓'; st.style.color = '#059669';
+        setTimeout(()=>{ st.innerText=''; }, 6000);
+      } catch(err){
+        console.error(err);
+        st.innerText = 'Failed ✕'; st.style.color = '#dc2626';
+        setTimeout(()=>{ st.innerText=''; }, 6000);
+        alert('Failed to create trip: ' + (err?.message || err));
+      }
+    });
+
+    // Quick simulate POST: calls backend endpoint to insert a point
+    document.getElementById('simulate').addEventListener('click', () => {
+      const trip = document.getElementById('trip').value.trim();
+      if(!trip) return alert('Enter trip id');
+      // small random deltas for smooth movement (~ up to ~50m)
+      const STEP = 0.0005;
+      const lat = marker ? marker.getLatLng().lat + (Math.random()-0.5)*STEP : START_LAT + (Math.random()-0.5)*STEP;
+      const lng = marker ? marker.getLatLng().lng + (Math.random()-0.5)*STEP : START_LNG + (Math.random()-0.5)*STEP;
+      fetch('/api/locations', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+        body: JSON.stringify({trip_id: trip, user_id: 1, lat: lat, lng: lng})
+      }).then(r=>r.json()).then(j=>log('Posted: '+JSON.stringify(j))).catch(e=>log('Post error: '+e));
+    });
+  </script>
+</body>
+</html>

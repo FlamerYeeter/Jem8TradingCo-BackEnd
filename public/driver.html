@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Driver Tracker (Mobile)</title>
+  <style>body{font-family:sans-serif;padding:12px}button{padding:8px 12px}#status{margin-top:8px}#log{margin-top:8px;font-family:monospace;white-space:pre-wrap}</style>
+</head>
+<body>
+  <h3>Driver Tracking (Mobile Browser)</h3>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <label>Trip ID: <input id="trip" value="makati-start" style="width:160px" /></label>
+    <label>Dest Lat: <input id="destLat" value="14.5546" style="width:120px" /></label>
+    <label>Dest Lng: <input id="destLng" value="121.0244" style="width:120px" /></label>
+    <label>Fallback (min): <input id="fallback" value="30" style="width:60px" /></label>
+    <button id="start">Start</button>
+    <button id="stop" disabled>Stop</button>
+  </div>
+  <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+    <input id="createAddressDriver" placeholder="Enter destination address (user house)" style="width:260px" />
+    <input id="createLatDriver" placeholder="lat (optional)" style="width:120px" />
+    <input id="createLngDriver" placeholder="lng (optional)" style="width:120px" />
+    <button id="createTripDriver">Create Trip (geocode & save)</button>
+    <div id="createStatusDriver" style="margin-left:8px;font-weight:600"></div>
+  </div>
+
+  <div id="status" style="margin-top:8px;font-weight:600">Status: idle</div>
+  <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+    <div style="min-width:220px">
+      <div><strong>Last Position</strong></div>
+      <div id="lastPos">—</div>
+    </div>
+    <div style="min-width:220px">
+      <div><strong>Telemetry</strong></div>
+      <div id="telemetry">Speed: — m/s · Bearing: —° · Accuracy: — m</div>
+    </div>
+    <div style="min-width:220px">
+      <div><strong>ETA</strong></div>
+      <div id="etaDriver">ETA: —</div>
+      <div id="minutesLeftDriver" style="font-size:20px;font-weight:700;color:#059669">— min</div>
+    </div>
+    <div style="flex:1;min-width:220px">
+      <div><strong>Last Send</strong></div>
+      <div id="lastSend">—</div>
+    </div>
+  </div>
+  <div id="log" style="margin-top:8px;font-family:monospace;white-space:pre-wrap"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    function log(s){ logEl.innerText = new Date().toISOString() + ' - ' + s + '\n' + logEl.innerText }
+
+    let watchId = null;
+    let sending = false;
+    let lastPos = null; // {lat,lng,ts}
+
+    function haversine(a, b){
+      const R = 6371000; // meters
+      const toRad = v => v * Math.PI/180;
+      const dLat = toRad(b.lat - a.lat);
+      const dLon = toRad(b.lng - a.lng);
+      const lat1 = toRad(a.lat);
+      const lat2 = toRad(b.lat);
+      const x = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+      return R * c;
+    }
+
+    async function sendPoint(payload){
+      try{
+        const res = await fetch('/api/public/driver/locations', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','Accept':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const j = await res.json();
+        if(!res.ok) throw new Error(JSON.stringify(j));
+        log('Sent: ' + JSON.stringify(j.location));
+        document.getElementById('lastSend').innerText = new Date().toISOString() + ' • id:' + (j.location?.id || '—');
+      } catch(e){
+        log('Send error: ' + e);
+      }
+    }
+
+    document.getElementById('start').addEventListener('click', async ()=>{
+      const trip = document.getElementById('trip').value.trim();
+      if(!trip) return alert('Enter trip id');
+
+      // try load trip info to prefill dest/start
+      try{
+        const r = await fetch('/api/public/trips/' + trip);
+        if(r.ok){
+          const j = await r.json();
+          if(j.trip){
+            const t = j.trip;
+            if(t.dest_lat && t.dest_lng) {
+              document.getElementById('destLat').value = t.dest_lat;
+              document.getElementById('destLng').value = t.dest_lng;
+            }
+            if(t.start_lat && t.start_lng){
+              // nothing to change on driver page, but we could show it
+            }
+          }
+        }
+      } catch(e){}
+
+      // wire up driver-side create trip button if pressed before start
+      document.getElementById('createTripDriver').addEventListener('click', async () => {
+        const tripId = document.getElementById('trip').value.trim();
+        const address = document.getElementById('createAddressDriver').value.trim();
+        const manualLat = document.getElementById('createLatDriver').value.trim();
+        const manualLng = document.getElementById('createLngDriver').value.trim();
+        if(!tripId) return alert('Enter trip id');
+        const st = document.getElementById('createStatusDriver');
+        try{
+          let lat, lon;
+          if(manualLat && manualLng){
+            lat = parseFloat(manualLat);
+            lon = parseFloat(manualLng);
+            if(Number.isNaN(lat) || Number.isNaN(lon)) throw new Error('Invalid coordinates');
+          } else {
+            if(!address) return alert('Enter an address or provide lat/lng');
+            log('Geocoding: ' + address);
+            const q = encodeURIComponent(address);
+            const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + q, {headers:{'Accept':'application/json'}});
+            const results = await r.json();
+            if(!results || results.length === 0) return alert('Address not found');
+            const place = results[0];
+            lat = parseFloat(place.lat);
+            lon = parseFloat(place.lon);
+          }
+
+          const start_lat = lastPos?.lat || null;
+          const start_lng = lastPos?.lng || null;
+          const payload = { trip_id: tripId, start_lat: start_lat, start_lng: start_lng, dest_lat: lat, dest_lng: lon, dest_address: address || null };
+          const save = await fetch('/api/public/trips', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+          const js = await save.json();
+          if(!save.ok) throw js;
+          log('Trip created: ' + JSON.stringify(js.trip));
+          document.getElementById('destLat').value = lat;
+          document.getElementById('destLng').value = lon;
+          st.innerText = 'Saved ✓'; st.style.color = '#059669';
+          setTimeout(()=>{ st.innerText=''; }, 6000);
+          alert('Trip saved and destination set');
+        } catch(err){
+          console.error(err);
+          st.innerText = 'Failed ✕'; st.style.color = '#dc2626';
+          setTimeout(()=>{ st.innerText=''; }, 6000);
+          alert('Failed to create trip: ' + (err?.message || err));
+        }
+      });
+
+      if(!('geolocation' in navigator)){
+        alert('Geolocation not supported');
+        return;
+      }
+
+      statusEl.innerText = 'Status: requesting permission';
+      try{
+        // get permission prompt
+        await navigator.permissions.query({name:'geolocation'});
+      } catch(e){}
+
+      statusEl.innerText = 'Status: watching position';
+      // high accuracy; call on each position update
+      watchId = navigator.geolocation.watchPosition(pos => {
+        const now = Date.now();
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy;
+        let speed = pos.coords.speed; // m/s or null
+        let bearing = pos.coords.heading;
+
+        // compute speed and bearing when unavailable
+        if((speed === null || speed === undefined) && lastPos){
+          const dt = (now - lastPos.ts) / 1000; // seconds
+          if(dt > 0){
+            const d = haversine({lat: lastPos.lat, lng: lastPos.lng}, {lat, lng});
+            speed = d / dt; // m/s
+          }
+        }
+        if((bearing === null || bearing === undefined) && lastPos){
+          const y = Math.sin((lng-lastPos.lng)*Math.PI/180) * Math.cos(lat*Math.PI/180);
+          const x = Math.cos(lastPos.lat*Math.PI/180)*Math.sin(lat*Math.PI/180) - Math.sin(lastPos.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.cos((lng-lastPos.lng)*Math.PI/180);
+          bearing = (Math.atan2(y,x) * 180/Math.PI + 360) % 360;
+        }
+
+        const payload = {
+          trip_id: trip,
+          user_id: null,
+          lat: lat,
+          lng: lng,
+          accuracy: accuracy,
+          speed: speed,
+          bearing: bearing,
+          timestamp: new Date(now).toISOString()
+        };
+
+        document.getElementById('lastPos').innerText = lat.toFixed(6) + ', ' + lng.toFixed(6) + ' • ' + new Date(now).toLocaleTimeString();
+        document.getElementById('telemetry').innerText = 'Speed: ' + (speed? speed.toFixed(2) : '—') + ' m/s · Bearing: ' + (bearing? bearing.toFixed(0) : '—') + '° · Accuracy: ' + (accuracy? accuracy.toFixed(0) : '—') + ' m';
+        log('Position: ' + JSON.stringify(payload));
+
+        // send but avoid overlapping sends and filter noisy updates
+        const shouldSend = (() => {
+          if(!lastPos) return true;
+          // ignore if accuracy is very bad
+          if(accuracy && accuracy > 200) return false;
+          const d = haversine({lat: lastPos.lat, lng: lastPos.lng}, {lat, lng});
+          // send if moved more than 5 meters or more than 10 seconds passed
+          if(d > 5) return true;
+          if((now - lastPos.ts) > 10000) return true;
+          return false;
+        })();
+
+        if(shouldSend && !sending){
+          sending = true;
+          sendPoint(payload).finally(()=>sending=false);
+          lastPos = {lat, lng, ts: now};
+
+          // update ETA for driver UI
+          try{
+            const destLat = parseFloat(document.getElementById('destLat').value) || lat;
+            const destLng = parseFloat(document.getElementById('destLng').value) || lng;
+            const fallbackMin = parseFloat(document.getElementById('fallback').value) || 30;
+            const rem = haversine({lat,lng},{lat:destLat,lng:destLng});
+            const ASSUMED_SPEED = 8.0; // m/s
+            let usedSpeed = (speed && speed > 0.5) ? speed : ASSUMED_SPEED;
+            const usedAssumption = !(speed && speed > 0.5);
+            let etaSeconds = rem / Math.max(0.1, usedSpeed);
+            const minutesLeft = Math.ceil(etaSeconds/60);
+            document.getElementById('etaDriver').innerText = 'Arrive ~ ' + new Date(Date.now() + etaSeconds*1000).toLocaleTimeString() + (usedAssumption ? ' (est)' : '');
+            document.getElementById('minutesLeftDriver').innerText = minutesLeft + ' min';
+          } catch(e){/* ignore */}
+        }
+      }, err => {
+        log('Position error: ' + err.message);
+        statusEl.innerText = 'Status: error - ' + err.message;
+      }, {enableHighAccuracy: true, maximumAge: 0, timeout: 20000});
+
+      document.getElementById('start').disabled = true;
+      document.getElementById('stop').disabled = false;
+    });
+
+    document.getElementById('stop').addEventListener('click', ()=>{
+      if(watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+      statusEl.innerText = 'Status: stopped';
+      document.getElementById('start').disabled = false;
+      document.getElementById('stop').disabled = true;
+    });
+
+    // Try using navigator.sendBeacon on unload to send final point
+    window.addEventListener('beforeunload', ()=>{
+      if(navigator.sendBeacon && watchId === null) return;
+      // no-op: could call sendBeacon with last known point if tracked in state
+    });
+  </script>
+</body>
+</html>
