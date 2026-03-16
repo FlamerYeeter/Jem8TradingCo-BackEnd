@@ -19,6 +19,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\TripController;
 
+use App\Http\Controllers\DeliveryController;
 
 // Public routes
 Route::post('/login', [AccountController::class, 'login']);
@@ -37,7 +38,7 @@ Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
 
 
 
-
+Route::get('/leadership', [AdminLeadershipController::class, 'adminImgIndex']);
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::post('/contact', [ContactController::class, 'store']);
 Route::get('/findaccount/{id}', [AccountController::class, 'show']);
@@ -73,6 +74,10 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     // Route::get('/products/category/{category}', [ShopController::class, 'productsByCategory']);
     // Route::post('/products', [ShopController::class, 'addProduct']);
     // Route::put('/products/{id}', [ShopController::class, 'updateProduct']);
+
+    Route::post('/leadership', [AdminLeadershipController::class, 'adminImgStore']);
+    Route::put('/leadership/{id}', [AdminLeadershipController::class, 'adminImgUpdate']);
+    Route::delete('/leadership/{id}', [AdminLeadershipController::class, 'adminImgDelete']);
     
     //
     //Hello
@@ -103,6 +108,11 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
 
     //checkout
     Route::get('/checkout', [CheckoutController::class, 'index']);
+    Route::post('/checkout', [CheckoutController::class, 'store']);
+
+    Route::get('/deliveries', [DeliveryController::class, 'index']);
+    Route::get('/my-deliveries', [DeliveryController::class, 'indexUser']);
+    Route::patch('/deliveries/{deliveryId}/status', [DeliveryController::class, 'updateStatus']);
     // Cart
     Route::post('/cart/add', [ShopController::class, 'addToCart']);
     Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);

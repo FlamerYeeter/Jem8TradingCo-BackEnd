@@ -43,6 +43,7 @@ class BlogController extends Controller
 
     // CREATE BLOG
     public function storeBlog(Request $request)
+<<<<<<< Updated upstream
 {
     try {
         $request->validate([
@@ -54,6 +55,19 @@ class BlogController extends Controller
             'images.*'       => 'image|max:5120',
             'status'         => 'required|in:draft,published,archived',
         ]);
+=======
+    {
+        try{
+            $request->validate([
+                'category_name'    => 'required|string|max:255',
+                'blog_title'       => 'required|string|max:255',
+                'blog_text'        => 'required|string',
+                'featured_image'   => 'nullable|image|max:5120',
+                'images'           => 'nullable|array',
+                'images.*'         => 'image|max:5120',
+                'status'           => 'required|in:draft,published,archived',
+            ]);
+>>>>>>> Stashed changes
 
         $category = CategoryBlog::firstOrCreate([
             'category_name' => $request->input('category_name')
