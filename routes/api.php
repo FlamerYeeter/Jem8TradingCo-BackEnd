@@ -16,6 +16,7 @@ use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\Dashboard;
 
 
 // Public routes
@@ -118,7 +119,6 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     Route::put('/addresses/{id}', [UserAddressController::class, 'update']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
 
-<<<<<<< HEAD
 
     //prods
     Route::post('/products', [ShopController::class, 'addProduct']);
@@ -153,22 +153,28 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
         Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
         Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
     });
-=======
     // Chat
+
+
+        // Routes using cookie/session authentication for SPA (Sanctum)
+    Route::middleware(['web','auth:sanctum'])->group(function () {
+        Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+        Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
+    });
+
+    Route::middleware([EnsureTokenIsValid::class])->group(function () {
+        Route::get('/admin/contacts',              [ContactController::class, 'index']);
+        Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
+        Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
+        Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
+        Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+    });
+    
+    //dashboard admin
+    Route::prefix('admin')->group(function(){
+    Route::get('/dashboard',[Dashboard::class, 'index']);
+    });
     
 });
 
-// Routes using cookie/session authentication for SPA (Sanctum)
-Route::middleware(['web','auth:sanctum'])->group(function () {
-    Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
-    Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
-});
 
-Route::middleware([EnsureTokenIsValid::class])->group(function () {
-    Route::get('/admin/contacts',              [ContactController::class, 'index']);
-    Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
-    Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
-    Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
-    Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
->>>>>>> c681468574960909dc386ae5e8fcd8f75250f260
-});

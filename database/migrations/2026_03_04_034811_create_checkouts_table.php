@@ -14,12 +14,6 @@ return new class extends Migration
 
             Schema::create('checkouts', function (Blueprint $table) {
 
-<<<<<<< HEAD
-            $table->foreign('cart_id')
-                ->references('cart_id')
-                ->on('cart')
-                ->onDelete('cascade');
-=======
                 $table->id('checkout_id');
 
                 $table->unsignedBigInteger('user_id');
@@ -54,7 +48,6 @@ return new class extends Migration
                     ->onDelete('set null');
             });
         }
->>>>>>> c681468574960909dc386ae5e8fcd8f75250f260
 
         Schema::enableForeignKeyConstraints();
     }
