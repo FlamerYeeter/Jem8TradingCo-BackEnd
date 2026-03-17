@@ -3,80 +3,260 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Account;
-use App\Models\Product;
-use App\Models\Checkout;
-use App\Models\Notification;
-use App\Models\UserAddress;
-use App\Models\Review;
-use App\Models\LiveChat;
-use App\Models\Message;
-use App\Models\Discount;
+
+use App\Models\Account;       
+use App\Models\Checkout;     
+use App\Models\UserAddress;   
+use App\Models\Contact;            
+use App\Models\Product;      
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class Dashboard extends Controller
 {
-    public function index(){
-        return view ('Dashboard',[
+    // public function index(){
+    //     return view ('dashboard',[
             
-            'total_views' => Account::count(),
-            'new_users' =>Account::whereMonth('created_at', now()->month)
-                                    ->whereYear('created_at', now()->year)
-                                    ->count(),
+    //         'total_views' => Account::count(),
+    //         'new_users' =>Account::whereMonth('created_at', now()->month)
+    //                                 ->whereYear('created_at', now()->year)
+    //                                 ->count(),
             
-            'active_users' =>Account::where('is_active', true)->count(),
+    //         'active_users' =>Account::where('is_active', true)->count(),
 
-            'user_this_year' =>Account::selectRaw('Month(created_at) as month, COUNT(*) as total')
-                                    ->whereYear('created_at',now()->year)
-                                    ->groupBy('month')
-                                    ->orderBy('month')
-                                    ->pluck('total','month'),
+    //         'user_this_year' =>Account::selectRaw('Month(created_at) as month, COUNT(*) as total')
+    //                                 ->whereYear('created_at',now()->year)
+    //                                 ->groupBy('month')
+    //                                 ->orderBy('month')
+    //                                 ->pluck('total','month'),
 
-            'users_last_year' =>Account::selectRaw('MONTH(created_at) as month, COUNT(*) as total')
-                                    ->whereYear('created_at', now()->year - 1)
-                                    ->groupBy('month')
-                                    ->orderBy('month')
-                                    ->pluck('total', 'month'),
-
-
-            'recent_orders'    => Checkout::with([
-                                    'user',                       // → accounts
-                                    'items.product.primaryImage', // → products + product_images (is_primary=1)
-                                    'deliveryStatus',             // → delivery_statuses
-                                ])
-                                ->latest()
-                                ->take(6)
-                                ->get(),
+    //         'users_last_year' =>Account::selectRaw('MONTH(created_at) as month, COUNT(*) as total')
+    //                                 ->whereYear('created_at', now()->year - 1)
+    //                                 ->groupBy('month')
+    //                                 ->orderBy('month')
+    //                                 ->pluck('total', 'month'),
 
 
-            'total_orders'     => Checkout::count(),
-            'pending_orders'   => Checkout::where('status', 'pending')->count(),
-            'completed_orders' => Checkout::where('status', 'completed')->count(),
-            'total_revenue'    => Checkout::where('status', 'completed')->sum('total_amount'),
+    //         'recent_orders'    => Checkout::with([
+    //                                 'user',                       // → accounts
+    //                                 'items.product.primaryImage', // → products + product_images (is_primary=1)
+    //                                 'deliveryStatus',             // → delivery_statuses
+    //                             ])
+    //                             ->latest()
+    //                             ->take(6)
+    //                             ->get(),
 
-            // This week only
-            'weekly_orders'    => Checkout::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
-            'weekly_pending'   => Checkout::where('status', 'pending')->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
-            'weekly_completed' => Checkout::where('status', 'completed')->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
 
-            'total_products'   => Product::count(),
-            'active_products'  => Product::where('status', 'active')->count(),
-            'low_stock'        => Product::where('stock_quantity', '<=', 5)->count(),
+    //         'total_orders'     => Checkout::count(),
+    //         'pending_orders'   => Checkout::where('status', 'pending')->count(),
+    //         'completed_orders' => Checkout::where('status', 'completed')->count(),
+    //         'total_revenue'    => Checkout::where('status', 'completed')->sum('total_amount'),
 
-            'sales_chart'      => Checkout::selectRaw('MONTH(created_at) as month, SUM(total_amount) as revenue')
-                                    ->where('status', 'completed')
-                                    ->whereYear('created_at', now()->year)
-                                    ->groupBy('month')
-                                    ->orderBy('month')
-                                    ->pluck('revenue', 'month'),
+    //         // This week only
+    //         'weekly_orders'    => Checkout::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
+    //         'weekly_pending'   => Checkout::where('status', 'pending')->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
+    //         'weekly_completed' => Checkout::where('status', 'completed')->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
+
+    //         'total_products'   => Product::count(),
+    //         'active_products'  => Product::where('status', 'active')->count(),
+    //         'low_stock'        => Product::where('stock_quantity', '<=', 5)->count(),
+
+    //         'sales_chart'      => Checkout::selectRaw('MONTH(created_at) as month, SUM(total_amount) as revenue')
+    //                                 ->where('status', 'completed')
+    //                                 ->whereYear('created_at', now()->year)
+    //                                 ->groupBy('month')
+    //                                 ->orderBy('month')
+    //                                 ->pluck('revenue', 'month'),
             
-            'geo_marketing' => UserAddress::selectRaw('city, COUNT(*) as total')
-                                    ->groupBy('city')
-                                    ->orderBy('total')
-                                    ->take(5)
-                                    ->pluck('total','city')
+    //         'geo_marketing' => UserAddress::selectRaw('city, COUNT(*) as total')
+    //                                 ->groupBy('city')
+    //                                 ->orderBy('total')
+    //                                 ->take(5)
+    //                                 ->pluck('total','city')
 
             
+    //     ]);
+    // }
+
+    public function allDashboard()
+    {
+        return response()->json([
+            'accounts' => $this->accounts(),
+            'orders'   => $this->orders(),
+            'sales'    => $this->sales(),
+            'traffic'  => $this->traffic(),
+            'contacts' => $this->contacts(),
         ]);
+    }
+    private function accounts(): array
+    {
+        return Cache::remember('dashboard.accounts', now()->addMinutes(10), function () {
+            $stats = Account::selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN email_verified_at IS NOT NULL THEN 1 ELSE 0 END) as verified,
+                SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) as new_today,
+                SUM(CASE WHEN MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW()) THEN 1 ELSE 0 END) as new_this_month
+            ")->first();
+
+            return [
+                    'total'          => $stats->total,
+                    'verified'       => $stats->verified,       // email verified users
+                    'unverified'     => $stats->total - $stats->verified, // not yet verified
+                    'new_today'      => $stats->new_today,
+                    'new_this_month' => $stats->new_this_month,
+
+                    'new_per_month'  => Account::selectRaw('MONTH(created_at) as month, COUNT(*) as total')
+                                            ->whereYear('created_at', now()->year)
+                                            ->groupBy('month')
+                                            ->orderBy('month')
+                                            ->pluck('total', 'month'),
+
+                    'recent'         => Account::latest()
+                                            ->take(6)
+                                            ->get(['id', 'first_name', 'last_name', 'email', 'created_at', 'email_verified_at']),
+            ];
+        });
+    }
+
+private function orders(): array
+{
+    return Cache::remember('dashboard.orders', now()->addMinutes(10), function () {
+
+        $all = Checkout::selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) as today,
+            SUM(CASE WHEN paid_at IS NOT NULL THEN 1 ELSE 0 END) as paid,
+            SUM(CASE WHEN paid_at IS NULL THEN 1 ELSE 0 END) as unpaid
+        ")->first();
+
+        $statusStats = DB::table('deliveries')->selectRaw("
+            SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
+            SUM(CASE WHEN status = 'ready'      THEN 1 ELSE 0 END) as ready,
+            SUM(CASE WHEN status = 'on_the_way' THEN 1 ELSE 0 END) as on_the_way,
+            SUM(CASE WHEN status = 'delivered'  THEN 1 ELSE 0 END) as delivered
+        ")->first();
+
+        $weekly = Checkout::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN paid_at IS NOT NULL THEN 1 ELSE 0 END) as paid,
+                SUM(CASE WHEN paid_at IS NULL THEN 1 ELSE 0 END) as unpaid
+            ")->first();
+
+        return [
+            'total'         => $all->total,
+            'today'         => $all->today,
+            'paid'          => $all->paid,
+            'unpaid'        => $all->unpaid,
+            'processing'    => $statusStats->processing,
+            'ready'         => $statusStats->ready,
+            'on_the_way'    => $statusStats->on_the_way,
+            'delivered'     => $statusStats->delivered,
+            'weekly_total'  => $weekly->total,
+            'weekly_paid'   => $weekly->paid,
+            'weekly_unpaid' => $weekly->unpaid,
+                'recent' => Checkout::select(
+                        'checkouts.checkout_id',
+                        'checkouts.payment_method',
+                        'checkouts.paid_amount',
+                        'checkouts.paid_at',
+                        'checkouts.created_at',
+                        'accounts.first_name',
+                        'accounts.last_name',
+                        'accounts.email'
+                )
+                ->join('accounts', 'accounts.id', '=', 'checkouts.user_id')
+                ->latest('checkouts.created_at')
+                ->take(6)
+                ->get(),
+        ];
+
+    });
+}
+
+        private function sales(): array{
+            return Cache::remember('dashboard.sales', now()->addMinutes(15), function () {
+            $revenue = Checkout::selectRaw("
+                SUM(paid_amount) as total,
+                SUM(CASE WHEN MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW()) THEN paid_amount ELSE 0 END) as this_month,
+                SUM(CASE WHEN DATE(created_at) = CURDATE() THEN paid_amount ELSE 0 END) as today
+            ")->first();
+
+            return [
+                'total'              => $revenue->total,
+                'this_month'         => $revenue->this_month,
+                'today'              => $revenue->today,
+                'monthly_chart'      => Checkout::selectRaw('MONTH(created_at) as month, SUM(paid_amount) as revenue')
+                                            ->whereYear('created_at', now()->year)
+                                            ->groupBy('month')->orderBy('month')
+                                            ->pluck('revenue', 'month'),
+                'monthly_chart_prev' => Checkout::selectRaw('MONTH(created_at) as month, SUM(paid_amount) as revenue')
+                                            ->whereYear('created_at', now()->year - 1)
+                                            ->groupBy('month')->orderBy('month')
+                                            ->pluck('revenue', 'month'),
+            ];
+        });
+    }
+    
+        private function traffic(): array{
+        return Cache::remember('dashboard.traffic', now()->addMinutes(15), function () {
+            return [
+                // users by address
+                'users_by_address'   => UserAddress::selectRaw('address, COUNT(*) as total')
+                                            ->groupBy('address')
+                                            ->orderByDesc('total')
+                                            ->take(10)
+                                            ->pluck('total', 'address'),
+
+                // orders by address (join with checkouts)
+                'orders_by_address'  => UserAddress::selectRaw('user_addresses.address, COUNT(checkouts.checkout_id) as total')
+                                            ->join('checkouts', 'checkouts.user_id', '=', 'user_addresses.user_id')
+                                            ->groupBy('user_addresses.address')
+                                            ->orderByDesc('total')
+                                            ->take(10)
+                                            ->pluck('total', 'address'),
+
+                // revenue by address
+                'revenue_by_address' => UserAddress::selectRaw('user_addresses.address, SUM(checkouts.paid_amount) as revenue')
+                                            ->join('checkouts', 'checkouts.user_id', '=', 'user_addresses.user_id')
+                                            ->groupBy('user_addresses.address')
+                                            ->orderByDesc('revenue')
+                                            ->take(10)
+                                            ->pluck('revenue', 'address'),
+
+                // users by company
+                'by_company'         => UserAddress::selectRaw('company_name, COUNT(*) as total')
+                                            ->whereNotNull('company_name')
+                                            ->groupBy('company_name')
+                                            ->orderByDesc('total')
+                                            ->take(10)
+                                            ->pluck('total', 'company_name'),
+            ];
+        });
+    }
+        private function contacts(): array
+    {
+        return Cache::remember('dashboard.contacts', now()->addMinutes(5), function () {
+            return [
+                'total'   => Contact::count(),
+                'today'   => Contact::whereDate('created_at', today())->count(),
+                'pending' => Contact::where('status', 'pending')->count(),
+                'read'    => Contact::where('status', 'read')->count(),
+                'replied' => Contact::where('status', 'replied')->count(),
+                
+                'recent'  => Contact::latest()
+                            ->take(6)
+                            ->get([
+                                'message_id',
+                                'first_name',
+                                'last_name',
+                                'email',
+                                'phone_number',
+                                'message',
+                                'status',
+                                'created_at',
+                            ]),
+            ];
+        });
     }
 }
