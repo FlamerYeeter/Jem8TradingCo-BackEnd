@@ -18,6 +18,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\TripController;
+use App\Http\Controllers\Dashboard;
+
 
 use App\Http\Controllers\DeliveryController;
 
