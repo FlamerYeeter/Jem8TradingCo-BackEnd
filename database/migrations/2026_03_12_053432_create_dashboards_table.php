@@ -13,6 +13,11 @@ return new class extends Migration
     {
         Schema::create('dashboards', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('views')->default(0);
+            $table->unsignedBigInteger('visits')->default(0);
+            $table->string('page')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('ip_address')->nullable();
             $table->timestamps();
         });
     }

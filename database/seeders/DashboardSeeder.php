@@ -16,6 +16,7 @@ class DashboardSeeder extends Seeder
         $this->seedCheckouts();
         $this->seedDeliveries();
         $this->seedContacts();
+        $this->seedViews();
     }
 
     // ── Accounts ──────────────────────────────────────────────
@@ -165,49 +166,74 @@ class DashboardSeeder extends Seeder
     // ── Contacts ──────────────────────────────────────────────
     // enum: 'pending', 'read', 'replied'
         private function seedContacts(): void
+    {
+        $firstNames = ['Juan', 'Maria', 'Carlo', 'Ana', 'Liza', 'Marco', 'Nina', 'Paolo', 'Rosa', 'Miguel'];
+        $lastNames  = ['Santos', 'Reyes', 'Cruz', 'Garcia', 'Mendoza', 'Torres', 'Flores', 'Rivera', 'Ramos', 'Aquino'];
+
+        $messages = [
+            'I would like to inquire about your products.',
+            'Can I get a bulk order discount?',
+            'When will my order arrive?',
+            'I have an issue with my recent order.',
+            'Do you deliver to Cebu?',
+            'What are your payment options?',
+            'I want to request a product catalog.',
+            'Is the item still available in stock?',
+            'Can I change my delivery address?',
+            'I would like to follow up on my order.',
+        ];
+
+        $statuses = ['pending', 'read', 'replied'];
+
+        // ✅ FK references users table, not accounts
+        $userIds = DB::table('users')->pluck('id')->toArray();
+
+        // if no users exist, set sender as null (it's nullable)
+        $contacts = [];
+        for ($i = 0; $i < 20; $i++) {
+            $firstName = $firstNames[array_rand($firstNames)];
+            $lastName  = $lastNames[array_rand($lastNames)];
+            $createdAt = Carbon::now()->subDays(rand(0, 90));
+
+            $contacts[] = [
+                'sender'       => !empty($userIds) ? $userIds[array_rand($userIds)] : null,
+                'first_name'   => $firstName,
+                'last_name'    => $lastName,
+                'phone_number' => '09' . rand(100000000, 999999999),
+                'email'        => strtolower($firstName . '.' . $lastName . $i . '@gmail.com'),
+                'message'      => $messages[array_rand($messages)],
+                'status'       => $statuses[array_rand($statuses)],
+                'created_at'   => $createdAt,
+                'updated_at'   => $createdAt,
+            ];
+        }
+
+        
+
+        DB::table('contacts')->insert($contacts);
+        $this->command->info('✅ Contacts seeded (20)');
+
+
+        
+    }
+    private function seedViews(): void
 {
-    $firstNames = ['Juan', 'Maria', 'Carlo', 'Ana', 'Liza', 'Marco', 'Nina', 'Paolo', 'Rosa', 'Miguel'];
-    $lastNames  = ['Santos', 'Reyes', 'Cruz', 'Garcia', 'Mendoza', 'Torres', 'Flores', 'Rivera', 'Ramos', 'Aquino'];
-
-    $messages = [
-        'I would like to inquire about your products.',
-        'Can I get a bulk order discount?',
-        'When will my order arrive?',
-        'I have an issue with my recent order.',
-        'Do you deliver to Cebu?',
-        'What are your payment options?',
-        'I want to request a product catalog.',
-        'Is the item still available in stock?',
-        'Can I change my delivery address?',
-        'I would like to follow up on my order.',
-    ];
-
-    $statuses = ['pending', 'read', 'replied'];
-
-    // ✅ FK references users table, not accounts
-    $userIds = DB::table('users')->pluck('id')->toArray();
-
-    // if no users exist, set sender as null (it's nullable)
-    $contacts = [];
-    for ($i = 0; $i < 20; $i++) {
-        $firstName = $firstNames[array_rand($firstNames)];
-        $lastName  = $lastNames[array_rand($lastNames)];
-        $createdAt = Carbon::now()->subDays(rand(0, 90));
-
-        $contacts[] = [
-            'sender'       => !empty($userIds) ? $userIds[array_rand($userIds)] : null,
-            'first_name'   => $firstName,
-            'last_name'    => $lastName,
-            'phone_number' => '09' . rand(100000000, 999999999),
-            'email'        => strtolower($firstName . '.' . $lastName . $i . '@gmail.com'),
-            'message'      => $messages[array_rand($messages)],
-            'status'       => $statuses[array_rand($statuses)],
-            'created_at'   => $createdAt,
-            'updated_at'   => $createdAt,
+    $rows = [];
+    for ($i = 30; $i >= 0; $i--) {
+        $date = Carbon::now()->subDays($i);
+        $rows[] = [
+            'views'      => rand(100, 500),
+            'visits'     => rand(50, 300),
+            'page'       => 'dashboard',
+            'user_id'    => null,
+            'ip_address' => '127.0.0.' . rand(1, 255),
+            'created_at' => $date,
+            'updated_at' => $date,
         ];
     }
 
-    DB::table('contacts')->insert($contacts);
-    $this->command->info('✅ Contacts seeded (20)');
+    DB::table('dashboards')->insert($rows);
+    $this->command->info('✅ Dashboard views seeded (30 days)');
 }
+
 }

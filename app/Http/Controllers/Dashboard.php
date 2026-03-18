@@ -9,8 +9,10 @@ use App\Models\Checkout;
 use App\Models\UserAddress;   
 use App\Models\Contact;            
 use App\Models\Product;      
+use App\Models\Notifications;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+
 
 class Dashboard extends Controller
 {
@@ -86,6 +88,9 @@ class Dashboard extends Controller
             'sales'    => $this->sales(),
             'traffic'  => $this->traffic(),
             'contacts' => $this->contacts(),
+            'products' => $this->products(),
+            'notifications' => $this->notifications(),
+            'views'=> $this->views(),
         ]);
     }
     private function accounts(): array
@@ -256,6 +261,67 @@ private function orders(): array
                                 'status',
                                 'created_at',
                             ]),
+            ];
+        });
+    }
+    private function products() : array{
+        return Cache::remember('dashboard.products', now()->addMinutes(10), function () {
+            return[
+                'total' => Product::count(),
+                'on_sale' => Product::where('isSale',true)->count(),
+                'low_stock' => Product::where('product_stocks', '<=', 5)->count(),
+                'out_stock' => Product::where('product_stocks', 0 )->count(),
+                'recent' =>Product::latest()
+                                    -> take(6)
+                                    -> get([
+                                        'product_id',
+                                        'product_name',
+                                        'price',
+                                        'product_stocks',
+                                        'isSale',
+                                        'created_at',
+                                    ]),
+            ];
+        });
+    }
+
+    private function notifications() : array{
+        return Cache::remember('dashboard.notifications', now()->addMinute(5), function () {
+            
+            return[
+                'total' => DB::table('notifications')->count(),
+                'unread' => DB::table('notifications')->where('is_read', false) -> count(),
+                'recent' => DB::table('notifications')
+                                    ->latest()
+                                    ->take(5)
+                                    ->get([
+                                        'notification_id',
+                                        'user_id',
+                                        'type',
+                                        'title',
+                                        'message',
+                                        'is_read',
+                                        'created_at',
+                                    ]),
+            ];
+            
+        });
+    }
+
+    private function views(): array
+    {
+        return Cache::remember('dashboard.views', now()->addMinutes(5), function () {
+            return [
+                'total_views'   => DB::table('dashboards')->sum('views'),
+                'total_visits'  => DB::table('dashboards')->sum('visits'),
+                'today_views'   => DB::table('dashboards')->whereDate('created_at', today())->sum('views'),
+                'today_visits'  => DB::table('dashboards')->whereDate('created_at', today())->sum('visits'),
+                'views_chart'   => DB::table('dashboards')
+                                        ->selectRaw('DATE(created_at) as date, SUM(views) as total')
+                                        ->where('created_at', '>=', now()->subDays(30))
+                                        ->groupBy('date')
+                                        ->orderBy('date')
+                                        ->pluck('total', 'date'),
             ];
         });
     }
