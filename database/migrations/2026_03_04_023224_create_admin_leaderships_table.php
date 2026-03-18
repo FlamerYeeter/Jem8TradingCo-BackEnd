@@ -11,21 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-            if (!Schema::hasTable('admin_leaderships')) {
+        if (!Schema::hasTable('admin_leaderships')) {
             Schema::create('admin_leaderships', function (Blueprint $table) {
                 $table->id('leadership_id');
-                $table->unsignedBigInteger('user_id');
+                $table->string('name', 255);
                 $table->string('position', 255);
                 $table->boolean('status')->default(true);
                 $table->string('leadership_img')->nullable();
                 $table->timestamps();
-
-                $table->foreign('user_id')
-                    ->references('id')
-                    ->on('users')
-                    ->onDelete('cascade');
             });
-            }
+        }
     }
 
     /**

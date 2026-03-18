@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::disableForeignKeyConstraints();
+        
         if (!Schema::hasTable('blog_imgs')) {
         Schema::create('blog_imgs', function (Blueprint $table) {
             $table->id();
@@ -19,7 +19,7 @@ return new class extends Migration
             $table->timestamps();
         });
         }
-        Schema::enableForeignKeyConstraints();
+        
     }
 
     public function down(): void

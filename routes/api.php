@@ -16,7 +16,12 @@ use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\LocationController;
+use App\Http\Controllers\TripController;
+use App\Http\Controllers\Dashboard;
 
+
+use App\Http\Controllers\DeliveryController;
 
 // ─── Public Routes ───────────────────────────────────────────────────────────
 Route::post('/login',          [AccountController::class, 'login']);
@@ -29,12 +34,22 @@ Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 Route::get('/reviews',                    [ReviewController::class, 'all']);
 Route::get('/reviews/{review}',           [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
-Route::get('/categories',                 [CategoryController::class, 'index']);
-Route::post('/contact',                   [ContactController::class, 'store']);
+
+//Prods
 
 
-// ─── Authenticated Routes ─────────────────────────────────────────────────────
-Route::middleware([EnsureTokenIsValid::class])->group(function () {
+
+Route::get('/leadership', [AdminLeadershipController::class, 'adminImgIndex']);
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::post('/contact', [ContactController::class, 'store']);
+Route::get('/findaccount/{id}', [AccountController::class, 'show']);
+// Routes that require authentication
+Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
+
+    Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply']);
+    Route::delete('/reviews/{review}/reply', [ReviewController::class, 'deleteReply']);
+
+
 
     // Account
     Route::get('/me',                    [AccountController::class, 'me']);
@@ -58,24 +73,73 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
         return response()->json(['message' => 'Welcome verified user']);
     });
 
-    // Products (public-ish, but requires auth)
-    Route::get('/products/{id}',    [ShopController::class, 'showProduct']);
-    Route::post('/products',        [ShopController::class, 'addProduct']);
-    Route::put('/products/{id}',    [ShopController::class, 'updateProduct']);
-    Route::delete('/products/{id}', [ShopController::class, 'deleteProduct']);
+    // Shop
+    // Route::get('/products', [ShopController::class, 'index']);
+    // Route::get('/products/category/{category}', [ShopController::class, 'productsByCategory']);
+    // Route::post('/products', [ShopController::class, 'addProduct']);
+    // Route::put('/products/{id}', [ShopController::class, 'updateProduct']);
 
-    // Cart
-    Route::get('/cart',             [ShopController::class, 'viewCart']);
-    Route::post('/cart/add',        [ShopController::class, 'addToCart']);
-    Route::patch('/cart/{id}',      [ShopController::class, 'updateCartQuantity']);
-    Route::put('/cart/{id}',        [ShopController::class, 'updateCartQuantity']);
-    Route::delete('/cart/{id}',     [ShopController::class, 'deleteFromCart']);
+    Route::post('/leadership', [AdminLeadershipController::class, 'adminImgStore']);
+    Route::put('/leadership/{id}', [AdminLeadershipController::class, 'adminImgUpdate']);
+    Route::delete('/leadership/{id}', [AdminLeadershipController::class, 'adminImgDelete']);
+
+    //
+    //Hello
+    Route::post('/cart/add', [ShopController::class, 'addToCart']);
+    Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
+    Route::patch('/cart/{id}',[ShopController::class, 'updateCartQuantity']);
+    Route::get('/cart',[ShopController::class, 'viewCart']);
+
+    // Admin Products
+    Route::post('/admin/products', [AdminProductController::class, 'addProduct']);
+    Route::get('/admin/products', [AdminProductController::class, 'showAllProducts']);
+    Route::get('/admin/products/{id}', [AdminProductController::class, 'showProduct']);
+    Route::put('/admin/products/{id}', [AdminProductController::class, 'updateProduct']);
+    Route::delete('/admin/products/{id}', [AdminProductController::class, 'deleteProduct']);
+
+    // Blogs
+    Route::get('/blogs', [BlogController::class, 'indexBlog']);
+    Route::post('/blogs', [BlogController::class, 'storeBlog']);
+    Route::get('/blogs/{id}', [BlogController::class, 'showAllBlog']);
+    Route::put('/blogs/{id}', [BlogController::class, 'blogUpdates']);
+    Route::delete('/blogs/{id}', [BlogController::class, 'deleteBlog']);
 
     // Reviews (authenticated)
     Route::post('/products/{product}/reviews', [ReviewController::class, 'store']);
-    Route::put('/reviews/{review}',            [ReviewController::class, 'update']);
-    Route::patch('/reviews/{review}',          [ReviewController::class, 'update']);
-    Route::delete('/reviews/{review}',         [ReviewController::class, 'destroy']);
+    Route::put('/reviews/{review}', [ReviewController::class, 'update']);
+    Route::patch('/reviews/{review}', [ReviewController::class, 'update']);
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
+
+    //checkout
+    Route::get('/checkout', [CheckoutController::class, 'index']);
+    Route::post('/checkout', [CheckoutController::class, 'store']);
+
+    Route::get('/deliveries', [DeliveryController::class, 'index']);
+    Route::get('/my-deliveries', [DeliveryController::class, 'indexUser']);
+    Route::patch('/deliveries/{deliveryId}/status', [DeliveryController::class, 'updateStatus']);
+    // Cart
+    Route::post('/cart/add', [ShopController::class, 'addToCart']);
+    Route::delete('/cart/{id}', [ShopController::class, 'deleteFromCart']);
+    Route::put('/cart/{id}', [ShopController::class, 'updateCartQuantity']);
+    Route::get('/products/{id}', [ShopController::class, 'showProduct']);
+
+
+    // Checkout
+
+
+    // Location tracking
+    Route::post('/locations', [LocationController::class, 'store']);
+    Route::get('/locations/{trip_id}/recent', [LocationController::class, 'recent']);
+
+    // Public route for demo/testing (no auth) to fetch recent points
+    Route::get('/public/locations/{trip_id}/recent', [LocationController::class, 'recent']);
+
+    // Public endpoint for driver/browser to POST location updates without token (demo only)
+    Route::post('/public/driver/locations', [LocationController::class, 'storePublic']);
+
+    // Public trip endpoints: create trip (start/dest) and fetch
+    Route::post('/public/trips', [TripController::class, 'store']);
+    Route::get('/public/trips/{trip_id}', [TripController::class, 'show']);
 
     // Addresses
     Route::get('/addresses',       [UserAddressController::class, 'index']);
@@ -84,12 +148,11 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::put('/addresses/{id}',  [UserAddressController::class, 'update']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
 
-    // Blogs
-    Route::get('/blogs',       [BlogController::class, 'indexBlog']);
-    Route::post('/blogs',      [BlogController::class, 'storeBlog']);
-    Route::get('/blogs/{id}',  [BlogController::class, 'showAllBlog']);
-    Route::put('/blogs/{id}',  [BlogController::class, 'blogUpdates']);
-    Route::delete('/blogs/{id}', [BlogController::class, 'deleteBlog']);
+
+    //prods
+    Route::post('/products', [ShopController::class, 'addProduct']);
+    Route::put('/products/{id}', [ShopController::class, 'updateProduct']);
+    Route::delete('/products/{id}', [ShopController::class, 'deleteProduct']);
 
     // Admin Products
     Route::prefix('admin')->group(function () {
@@ -123,4 +186,36 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
         });
     });
 
+
+    Route::middleware([EnsureTokenIsValid::class])->group(function () {
+        Route::get('/admin/contacts',              [ContactController::class, 'index']);
+        Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
+        Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
+        Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
+        Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+    });
+    // Chat
+
+
+        // Routes using cookie/session authentication for SPA (Sanctum)
+    Route::middleware(['web','auth:sanctum'])->group(function () {
+        Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+        Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
+    });
+
+    Route::middleware([EnsureTokenIsValid::class])->group(function () {
+        Route::get('/admin/contacts',              [ContactController::class, 'index']);
+        Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
+        Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
+        Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
+        Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+    });
+
+    //dashboard admin
+    Route::prefix('admin')->group(function(){
+    Route::get('/dashboard',[Dashboard::class, 'allDashboard']);
+    });
+
 });
+
+

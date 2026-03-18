@@ -141,7 +141,7 @@ class ShopController extends Controller
             ], 404);
 
         }catch(\Exception $e){
-             return response()->json([
+            return response()->json([
                 'status' => 'error',
                 'type' => 'server',
                 'message' => $e->getMessage()
@@ -228,8 +228,16 @@ class ShopController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $cartItems = Cart::with('product')->where('user_id', $user->id)->get();
-        
+        $query = Cart::with('product')
+            ->where('user_id', $user->id);
+
+        // Filter by isCheckout true or false
+        if ($request->has('isCheckout')) {
+            $query->where('is_checkout', $request->boolean('isCheckout'));
+        }
+
+        $cartItems = $query->get();
+
         return response()->json([
             'cartItems' => $cartItems
         ], 200);

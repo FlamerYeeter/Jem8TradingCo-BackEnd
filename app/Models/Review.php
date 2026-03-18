@@ -25,6 +25,8 @@ class Review extends Model
         'rating',
         'review_text',
         'status',
+        'admin_reply',
+        'replied_at',
     ];
 
     // Belongs to product

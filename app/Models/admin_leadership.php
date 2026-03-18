@@ -23,7 +23,7 @@ class admin_leadership extends Model
      * The attributes that are mass assignable.
      */
     protected $fillable = [
-        'user_id',
+        'name',
         'position',
         'status',
         'leadership_img',
@@ -39,8 +39,8 @@ class admin_leadership extends Model
     /**
      * Get the user that owns this leadership record.
      */
-    public function user()
-    {
-        return $this->belongsTo(User::class, 'user_id');
-    }
+    // public function user()
+    // {
+    //     return $this->belongsTo(User::class, 'user_id');
+    // }
 }

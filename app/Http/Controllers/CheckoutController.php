@@ -3,134 +3,233 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cart;
+use App\Models\Checkout;
 use App\Models\Product;
-use App\Models\Receipt;
-use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Log;
+use App\Models\Delivery;
 class CheckoutController extends Controller
 {
-    // Create a checkout from the current user's cart
-    public function store(Request $request)
+    // In CheckoutController.php
+
+    public function index(Request $request)
     {
         $user = $request->user();
-        if (! $user) {
+        if (!$user) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
+        // Fetch all checkouts for the user with cart items and delivery
+        $orders = Checkout::with(['cart.product', 'delivery'])
+                        ->where('user_id', $user->id)
+                        ->orderBy('created_at', 'desc')
+                        ->get();
+
+        return response()->json($orders);
+    }
+    public function store(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // Get all cart items for the user
         $cartItems = Cart::where('user_id', $user->id)->with('product')->get();
         if ($cartItems->isEmpty()) {
             return response()->json(['message' => 'Cart is empty'], 400);
         }
 
         $request->validate([
-            'payment_method' => 'sometimes|string|max:255',
-            'payment_reference' => 'sometimes|string|max:255',
-            'shipping_fee' => 'sometimes|numeric|min:0',
-            'special_instructions' => 'sometimes|string|max:2000',
+            'payment_method'       => 'required|string|max:255',
+            'payment_details'      => 'nullable|array',
+            'shipping_fee'         => 'sometimes|numeric|min:0',
+            'special_instructions' => 'sometimes|nullable|string|max:2000',
         ]);
 
-        $shippingFee = $request->input('shipping_fee', 0);
+        $method      = $request->input('payment_method');
+        $details     = $request->input('payment_details', []);
+        $shippingFee = (float) $request->input('shipping_fee', 0);
 
-        // Calculate totals and validate stock
-        $grandTotal = 0.0;
+        // Validate payment details
+        switch ($method) {
+            case 'gcash':
+            case 'maya':
+                $request->validate([
+                    'payment_details.mobile_number' => 'required|string',
+                    'payment_details.account_name'  => 'required|string',
+                ]);
+                $paymentDetails = [
+                    'mobile_number' => $details['mobile_number'],
+                    'account_name'  => $details['account_name'],
+                ];
+                break;
+
+            case 'bank_transfer':
+                $request->validate([
+                    'payment_details.bank_name'        => 'required|string',
+                    'payment_details.account_name'     => 'required|string',
+                    'payment_details.account_number'   => 'required|string',
+                    'payment_details.reference_number' => 'nullable|string',
+                ]);
+                $paymentDetails = [
+                    'bank_name'        => $details['bank_name'],
+                    'account_name'     => $details['account_name'],
+                    'account_number'   => $details['account_number'],
+                    'reference_number' => $details['reference_number'] ?? null,
+                ];
+                break;
+
+            case 'check':
+                $request->validate([
+                    'payment_details.bank_name'    => 'required|string',
+                    'payment_details.check_number' => 'required|string',
+                    'payment_details.check_date'   => 'required|date',
+                    'payment_details.check_amount' => 'required|numeric',
+                ]);
+                $paymentDetails = [
+                    'bank_name'    => $details['bank_name'],
+                    'check_number' => $details['check_number'],
+                    'check_date'   => $details['check_date'],
+                    'check_amount' => $details['check_amount'],
+                ];
+                break;
+
+            case 'cod':
+                $paymentDetails = ['type' => 'cash_on_delivery'];
+                break;
+
+            default:
+                return response()->json(['message' => 'Invalid payment method'], 400);
+        }
+
+        // Calculate grand total & check stock
+        $grandTotal = 0;
         foreach ($cartItems as $item) {
-            $price = floatval($item->product->price ?? 0);
-            $grandTotal += $price * intval($item->quantity);
-            // Stock check
+            $price = (float) ($item->product->price ?? 0);
+            $grandTotal += $price * (int) $item->quantity;
+
             if (isset($item->product->product_stocks) && $item->product->product_stocks < $item->quantity) {
-                return response()->json(['message' => 'Insufficient stock for product', 'product_id' => $item->product_id], 400);
+                return response()->json([
+                    'message'    => 'Insufficient stock',
+                    'product_id' => $item->product_id,
+                ], 400);
             }
         }
 
-        $paidAmount = $grandTotal + floatval($shippingFee);
+        $paidAmount    = $grandTotal + $shippingFee;
+        $paidAt        = in_array($method, ['gcash', 'maya']) ? now() : null;
 
         DB::beginTransaction();
         try {
-            $checkout = DB::table('checkout')->insertGetId([
-                'user_id' => $user->id,
-                'cart_id' => null,
-                'discount_id' => null,
-                'payment_method' => $request->input('payment_method'),
-                'payment_reference' => $request->input('payment_reference'),
-                'shipping_fee' => $shippingFee,
-                'paid_amount' => $paidAmount,
-                'paid_at' => $request->has('payment_method') ? now() : null,
+            // Create checkout
+            $checkout = Checkout::create([
+                'user_id'              => $user->id,
+                'discount_id'          => null,
+                'payment_method'       => $method,
+                'payment_details'      => $paymentDetails,
+                'shipping_fee'         => $shippingFee,
+                'paid_amount'          => $paidAmount,
+                'paid_at'              => $paidAt,
                 'special_instructions' => $request->input('special_instructions'),
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
+            $checkoutId = $checkout->checkout_id;
 
             // Create receipt
-            $receiptNumber = null;
+            $paymentReference = json_encode($paymentDetails); // store JSON in payment_reference
             do {
                 $receiptNumber = 'RCPT-' . time() . '-' . rand(1000, 9999);
-            } while (Receipt::where('receipt_number', $receiptNumber)->exists());
+            } while (DB::table('receipts')->where('receipt_number', $receiptNumber)->exists());
 
-            $receipt = Receipt::create([
-                'user_id' => $user->id,
-                'checkout_id' => $checkout,
-                'receipt_number' => $receiptNumber,
-                'payment_method' => $request->input('payment_method'),
-                'payment_reference' => $request->input('payment_reference'),
-                'paid_amount' => $paidAmount,
-                'paid_at' => $request->has('payment_method') ? now() : null,
+            $receiptId = DB::table('receipts')->insertGetId([
+                'user_id'           => $user->id,
+                'checkout_id'       => $checkoutId,
+                'receipt_number'    => $receiptNumber,
+                'payment_method'    => $method,
+                'payment_reference' => $paymentReference,
+                'paid_amount'       => $paidAmount,
+                'paid_at'           => $paidAt,
+                'created_at'        => now(),
+                'updated_at'        => now(),
             ]);
 
-            // Create invoice
-            $invoiceNumber = null;
+            $delivery = Delivery::create([
+                'checkout_id' => $checkoutId,
+                'status'      => 'processing',
+                'notes'       => $request->input('special_instructions', null),
+            ]);
+
+            /*
+            // Commented out invoice creation for now
             do {
                 $invoiceNumber = 'INV-' . time() . '-' . rand(1000, 9999);
-            } while (Invoice::where('invoice_number', $invoiceNumber)->exists());
+            } while (DB::table('invoices')->where('invoice_number', $invoiceNumber)->exists());
 
-            $invoice = Invoice::create([
-                'user_id' => $user->id,
-                'checkout_id' => $checkout,
-                'receipt_id' => $receipt->receipt_id,
+            $invoiceId = DB::table('invoices')->insertGetId([
+                'user_id'        => $user->id,
+                'checkout_id'    => $checkoutId,
+                'receipt_id'     => $receiptId,
                 'invoice_number' => $invoiceNumber,
-                'billing_address' => null,
-                'tax_amount' => 0,
-                'total_amount' => $paidAmount,
-                'status' => $request->has('payment_method') ? 'paid' : 'unpaid',
-                'issued_at' => now(),
+                'billing_address'=> null,
+                'tax_amount'     => 0,
+                'total_amount'   => $paidAmount,
+                'status'         => $paymentStatus === 'paid' ? 'paid' : 'unpaid',
+                'issued_at'      => now(),
+                'created_at'     => now(),
+                'updated_at'     => now(),
             ]);
+            */
 
-            // Deduct stock and optionally create order items if you have an order_items table
-            foreach ($cartItems as $item) {
-                $product = Product::find($item->product_id);
-                if ($product && isset($product->product_stocks)) {
-                    $product->product_stocks = max(0, $product->product_stocks - $item->quantity);
-                    $product->save();
+            // Deduct stock for instant-pay methods
+            if (in_array($method, ['gcash', 'maya', 'cod'])) {
+                foreach ($cartItems as $item) {
+                    $product = Product::find($item->product_id);
+                    if ($product && isset($product->product_stocks)) {
+                        $product->product_stocks = max(0, $product->product_stocks - $item->quantity);
+                        $product->save();
+                    }
                 }
             }
 
-            // Clear user's cart
-            Cart::where('user_id', $user->id)->delete();
+            // Clear cart
+            Cart::where('user_id', $user->id)
+                ->whereIn('user_id', $cartItems->pluck('user_id'))
+                ->update(['is_checkout' => true]);
 
             DB::commit();
 
-            $response = [
-                'checkout_id' => $checkout,
-                'user_id' => $user->id,
-                'paid_amount' => number_format($paidAmount, 2, '.', ''),
-                'shipping_fee' => number_format(floatval($shippingFee), 2, '.', ''),
-                'receipt' => $receipt,
-                'invoice' => $invoice,
-                'items' => $cartItems->map(function ($i) {
-                    return [
-                        'product_id' => $i->product_id,
-                        'quantity' => $i->quantity,
-                        'price' => (string) $i->product->price,
-                        'total' => number_format(floatval($i->product->price) * $i->quantity, 2, '.', ''),
-                    ];
-                })->values(),
-            ];
+            return response()->json([
+                'checkout_id'  => $checkoutId,
+                'user_id'      => $user->id,
+                'paid_amount'  => number_format($paidAmount, 2, '.', ''),
+                'shipping_fee' => number_format($shippingFee, 2, '.', ''),
+                'receipt_id'   => $receiptId,
+                // 'invoice_id' => $invoiceId, // removed
+                'items'        => $cartItems->map(fn($i) => [
+                    'product_id' => $i->product_id,
+                    'quantity'   => $i->quantity,
+                    'price'      => (string) $i->product->price,
+                    'total'      => number_format((float) $i->product->price * $i->quantity, 2, '.', ''),
+                ]),
+            ], 201);
 
-            return response()->json($response, 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Checkout failed', 'error' => $e->getMessage()], 500);
+            Log::error('Checkout failed', [
+                'message' => $e->getMessage(),
+                'line'    => $e->getLine(),
+                'file'    => $e->getFile(),
+                'trace'   => $e->getTraceAsString(),
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'message' => 'Checkout failed',
+                'error'   => $e->getMessage(),
+                'line'    => $e->getLine(),
+                'file'    => basename($e->getFile()),
+            ], 500);
         }
     }
 }
