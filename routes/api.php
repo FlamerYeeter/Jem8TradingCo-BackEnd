@@ -23,17 +23,16 @@ use App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\DeliveryController;
 
-// Public routes
-Route::post('/login', [AccountController::class, 'login']);
-Route::post('/register', [AccountController::class, 'store']);
-Route::post('/verify', [AccountController::class, 'verifyEmail']);
-Route::post('/forgot-password', [AccountController::class, 'forgotPassword']);
+// ─── Public Routes ───────────────────────────────────────────────────────────
+Route::post('/login',          [AccountController::class, 'login']);
+Route::post('/register',       [AccountController::class, 'store']);
+Route::post('/verify',         [AccountController::class, 'verifyEmail']);
+Route::post('/forgot-password',[AccountController::class, 'forgotPassword']);
 Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 
-
 // Reviews (public)
-Route::get('/reviews', [ReviewController::class, 'all']);
-Route::get('/reviews/{review}', [ReviewController::class, 'show']);
+Route::get('/reviews',                    [ReviewController::class, 'all']);
+Route::get('/reviews/{review}',           [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
 
 //Prods
@@ -53,13 +52,13 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
 
 
     // Account
-    Route::get('/me', [AccountController::class, 'me']);
-    Route::post('/profile/update', [AccountController::class, 'updateProfile']);
+    Route::get('/me',                    [AccountController::class, 'me']);
+    Route::post('/profile/update',       [AccountController::class, 'updateProfile']);
     Route::post('/profile/update-image', [AccountController::class, 'updateProfileImage']);
-    Route::delete('/delete-account', [AccountController::class, 'destroy']);
-    Route::post('/logout', [AccountController::class, 'logout']);
+    Route::delete('/delete-account',     [AccountController::class, 'destroy']);
+    Route::post('/logout',               [AccountController::class, 'logout']);
 
-    // Email verification routes
+    // Email Verification
     Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
         $request->fulfill();
         return response()->json(['message' => 'Email verified successfully']);
@@ -83,7 +82,7 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     Route::post('/leadership', [AdminLeadershipController::class, 'adminImgStore']);
     Route::put('/leadership/{id}', [AdminLeadershipController::class, 'adminImgUpdate']);
     Route::delete('/leadership/{id}', [AdminLeadershipController::class, 'adminImgDelete']);
-    
+
     //
     //Hello
     Route::post('/cart/add', [ShopController::class, 'addToCart']);
@@ -126,12 +125,12 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
 
 
     // Checkout
-    
+
 
     // Location tracking
     Route::post('/locations', [LocationController::class, 'store']);
     Route::get('/locations/{trip_id}/recent', [LocationController::class, 'recent']);
-    
+
     // Public route for demo/testing (no auth) to fetch recent points
     Route::get('/public/locations/{trip_id}/recent', [LocationController::class, 'recent']);
 
@@ -143,10 +142,10 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     Route::get('/public/trips/{trip_id}', [TripController::class, 'show']);
 
     // Addresses
-    Route::get('/addresses', [UserAddressController::class, 'index']);
-    Route::post('/addresses', [UserAddressController::class, 'store']);
-    Route::get('/addresses/{id}', [UserAddressController::class, 'show']);
-    Route::put('/addresses/{id}', [UserAddressController::class, 'update']);
+    Route::get('/addresses',       [UserAddressController::class, 'index']);
+    Route::post('/addresses',      [UserAddressController::class, 'store']);
+    Route::get('/addresses/{id}',  [UserAddressController::class, 'show']);
+    Route::put('/addresses/{id}',  [UserAddressController::class, 'update']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
 
 
@@ -155,23 +154,35 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
     Route::put('/products/{id}', [ShopController::class, 'updateProduct']);
     Route::delete('/products/{id}', [ShopController::class, 'deleteProduct']);
 
-    //admin leadership
+    // Admin Products
     Route::prefix('admin')->group(function () {
-        Route::get('/imgs',           [AdminLeadershipController::class, 'adminImgIndex']);
-        Route::post('/imgs/store',    [AdminLeadershipController::class, 'adminImgStore']);
-        Route::get('/imgs/{id}',      [AdminLeadershipController::class, 'adminImgShow']);   // fix: was pointing to wrong method
-        Route::put('/imgs/{id}',      [AdminLeadershipController::class, 'adminImgUpdate']);
-        Route::delete('/imgs/{id}',   [AdminLeadershipController::class, 'adminImgDelete']);
-    });
+        Route::post('/products',       [AdminProductController::class, 'addProduct']);
+        Route::get('/products',        [AdminProductController::class, 'showAllProducts']);
+        Route::get('/products/{id}',   [AdminProductController::class, 'showProduct']);
+        Route::put('/products/{id}',   [AdminProductController::class, 'updateProduct']);
+        Route::delete('/products/{id}',[AdminProductController::class, 'deleteProduct']);
 
-    //admin backup
-    Route::prefix('admin')->group(function () {
+        // Admin Contacts
+        Route::get('/contacts',                  [ContactController::class, 'index']);
+        Route::get('/contacts/{id}',             [ContactController::class, 'show']);
+        Route::patch('/contacts/{id}/status',    [ContactController::class, 'updateStatus']);
+        Route::delete('/contacts/{id}',          [ContactController::class, 'destroy']);
+        Route::post('/contacts/{id}/reply',      [ContactController::class, 'reply']);
+
+        // Admin Leadership Images
+        Route::get('/imgs',          [AdminLeadershipController::class, 'adminImgIndex']);
+        Route::post('/imgs/store',   [AdminLeadershipController::class, 'adminImgStore']);
+        Route::get('/imgs/{id}',     [AdminLeadershipController::class, 'adminImgShow']);
+        Route::put('/imgs/{id}',     [AdminLeadershipController::class, 'adminImgUpdate']);
+        Route::delete('/imgs/{id}',  [AdminLeadershipController::class, 'adminImgDelete']);
+
+        // Admin Backup
         Route::prefix('backup')->group(function () {
-            Route::get('/',              [AdminBackupController::class, 'adminHistoryBackup']);
-            Route::post('/run',          [AdminBackupController::class, 'adminRunBackup']);
-            Route::get('/download/{id}', [AdminBackupController::class, 'adminDownloadBackup']);
-            Route::delete('/{id}',       [AdminBackupController::class, 'adminDeleteBackup']);
-            Route::post('/restore',      [AdminBackupController::class, 'adminUploadRestore']);
+            Route::get('/',               [AdminBackupController::class, 'adminHistoryBackup']);
+            Route::post('/run',           [AdminBackupController::class, 'adminRunBackup']);
+            Route::get('/download/{id}',  [AdminBackupController::class, 'adminDownloadBackup']);
+            Route::delete('/{id}',        [AdminBackupController::class, 'adminDeleteBackup']);
+            Route::post('/restore',       [AdminBackupController::class, 'adminUploadRestore']);
         });
     });
 
@@ -184,11 +195,14 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
         Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
     });
     // Chat
-
+    // Allow token-authenticated clients to POST messages (no CSRF required)
+    Route::post('/chat/messages/token', [\App\Http\Controllers\ChatController::class, 'store'])
+        ->middleware(EnsureTokenIsValid::class);
 
         // Routes using cookie/session authentication for SPA (Sanctum)
     Route::middleware(['web','auth:sanctum'])->group(function () {
         Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+        Route::get('/chat/messages/{chatroom_id}', [\App\Http\Controllers\ChatController::class, 'show']);
         Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
     });
 
@@ -199,12 +213,12 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
         Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
         Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
     });
-    
+
     //dashboard admin
     Route::prefix('admin')->group(function(){
     Route::get('/dashboard',[Dashboard::class, 'allDashboard']);
     });
-    
+
 });
 
 
