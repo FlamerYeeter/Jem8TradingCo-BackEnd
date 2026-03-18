@@ -12,22 +12,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Schema::table('user_addresses', function (Blueprint $table) {
-        //     $table->enum('type', ['personal', 'company'])->default('personal')->after('user_id');
+        Schema::table('user_addresses', function (Blueprint $table) {
+            $table->enum('type', ['personal', 'company'])->default('personal')->after('user_id');
 
-        //     // address details (keep existing `address` column for compatibility)
-        //     $table->string('street')->nullable()->after('company_email');
-        //     $table->string('barangay')->nullable()->after('street');
-        //     $table->string('city')->nullable()->after('barangay');
-        //     $table->string('province')->nullable()->after('city');
-        //     $table->string('postal_code')->nullable()->after('province');
-        //     $table->string('country')->nullable()->default('Philippines')->after('postal_code');
-        // });
+            // address details (keep existing `address` column for compatibility)
+            $table->string('street')->nullable()->after('company_email');
+            $table->string('barangay')->nullable()->after('street');
+            $table->string('city')->nullable()->after('barangay');
+            $table->string('province')->nullable()->after('city');
+            $table->string('postal_code')->nullable()->after('province');
+            $table->string('country')->nullable()->default('Philippines')->after('postal_code');
+        });
 
-        // // copy existing free-form `address` into `street` for current rows
-        // DB::table('user_addresses')->whereNotNull('address')->update([
-        //     'street' => DB::raw('address'),
-        // ]);
+        // copy existing free-form `address` into `street` for current rows
+        DB::table('user_addresses')->whereNotNull('address')->update([
+            'street' => DB::raw('address'),
+        ]);
     }
 
     /**
