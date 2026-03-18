@@ -195,11 +195,14 @@ Route::middleware([EnsureTokenIsValid::class]   )->group(function () {
         Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
     });
     // Chat
-
+    // Allow token-authenticated clients to POST messages (no CSRF required)
+    Route::post('/chat/messages/token', [\App\Http\Controllers\ChatController::class, 'store'])
+        ->middleware(EnsureTokenIsValid::class);
 
         // Routes using cookie/session authentication for SPA (Sanctum)
     Route::middleware(['web','auth:sanctum'])->group(function () {
         Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+        Route::get('/chat/messages/{chatroom_id}', [\App\Http\Controllers\ChatController::class, 'show']);
         Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
     });
 

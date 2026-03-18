@@ -44,4 +44,23 @@ class ChatController extends Controller
 
         return response()->json($message, 201);
     }
+
+    /**
+     * Fetch messages for a chatroom via route parameter.
+     */
+    public function show($chatroomId, Request $request)
+    {
+        $limit = $request->query('limit');
+
+        $query = Message::where('chatroom_id', $chatroomId)
+            ->orderBy('created_at', 'asc');
+
+        if ($limit) {
+            $messages = $query->take((int) $limit)->get();
+        } else {
+            $messages = $query->get();
+        }
+
+        return response()->json($messages);
+    }
 }

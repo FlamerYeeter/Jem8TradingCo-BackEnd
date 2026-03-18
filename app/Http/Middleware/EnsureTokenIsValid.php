@@ -28,8 +28,8 @@ class EnsureTokenIsValid
             return $next($request);
         }
 
-        // Fallback to token stored in cookie named 'jem8_token'
-        $token = $request->cookie('jem8_token');
+        // Accept Authorization: Bearer <token> or fallback to cookie 'jem8_token'
+        $token = $request->bearerToken() ?: $request->cookie('jem8_token');
 
         if (!$token) {
             return response()->json([

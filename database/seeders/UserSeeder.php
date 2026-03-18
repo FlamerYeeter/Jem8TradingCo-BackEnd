@@ -11,9 +11,11 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('accounts')->insert([
+        DB::table('accounts')->insertOrIgnore([
             [
-                'name' => 'Admin User',
+                'first_name' => 'Admin',
+                'last_name' => 'User',
+                'phone_number' => '09170000001',
                 'email' => 'admin@example.com',
                 'email_verified_at' => Carbon::now(), // verified
                 'password' => Hash::make('password123'),
@@ -21,7 +23,9 @@ class UserSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'name' => 'Normal User',
+                'first_name' => 'Normal',
+                'last_name' => 'User',
+                'phone_number' => '09170000002',
                 'email' => 'user@example.com',
                 'email_verified_at' => Carbon::now(), // verified
                 'password' => Hash::make('password123'),
