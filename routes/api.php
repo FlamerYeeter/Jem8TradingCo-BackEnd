@@ -139,11 +139,11 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
 
 });
 
-// Routes using cookie/session authentication for SPA (Sanctum)
-Route::middleware(['web','auth:sanctum'])->group(function () {
-    Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
-    Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
-});
+// Chat routes (public)
+Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'index']);
+Route::post('/chat/messages', [\App\Http\Controllers\ChatController::class, 'store']);
+Route::get('/chat/rooms', [\App\Http\Controllers\ChatController::class, 'rooms']);
+Route::get('/chat/rooms/summary', [\App\Http\Controllers\ChatController::class, 'roomsSummary']);
 
 Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/admin/contacts',              [ContactController::class, 'index']);

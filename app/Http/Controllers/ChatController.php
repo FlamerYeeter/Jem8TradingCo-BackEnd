@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\NewMessage;
 use App\Models\Message;
+use App\Models\LiveChat;
 use Illuminate\Http\Request;
 
 class ChatController extends Controller
@@ -62,5 +63,46 @@ class ChatController extends Controller
         }
 
         return response()->json($messages);
+    }
+
+    /**
+     * Return available chat rooms.
+     */
+    public function rooms()
+    {
+        $rooms = LiveChat::withCount('messages')
+            ->orderBy('chatroom_id', 'asc')
+            ->get();
+
+        return response()->json($rooms);
+    }
+
+    /**
+     * Return chat rooms with latest message and account info for display lists.
+     */
+    public function roomsSummary()
+    {
+        $rooms = LiveChat::with(['user:id,first_name,last_name,profile_image', 'messages' => function ($q) {
+                $q->orderBy('created_at', 'desc')->limit(1);
+            }])
+            ->withCount('messages')
+            ->orderBy('chatroom_id', 'desc')
+            ->get()
+            ->map(function ($room) {
+                $last = $room->messages->first();
+                return [
+                    'chatroom_id' => $room->chatroom_id,
+                    'account' => $room->user,
+                    'last_message' => $last ? [
+                        'message_id' => $last->message_id,
+                        'messages' => $last->messages,
+                        'created_at' => $last->created_at,
+                    ] : null,
+                    'messages_count' => $room->messages_count,
+                    'status' => $room->status,
+                ];
+            });
+
+        return response()->json($rooms);
     }
 }
