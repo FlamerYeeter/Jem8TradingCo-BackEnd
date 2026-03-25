@@ -14,23 +14,23 @@ class BlogController extends Controller
     public function indexBlog(Request $request)
     {
         try{
-        
-        $query = Blog::with('category');
-        
+
+$query = Blog::with(['category', 'images']);
+
         if ($request->has('category')){
             $categoryName = $request->input('category');
             $query->whereHas('category', function($q) use ($categoryName) {
                 $q->where('category_name', $categoryName);
             });
         }
-        
+
             $blogs = $query->get();
 
         return response()->json([
             'status'  => 'success',
             'data'    => $blogs,
         ], 200);
-        
+
         }catch(\Exception $e){
             return response()->json([
                 'status' => 'error',
@@ -38,7 +38,7 @@ class BlogController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
-        
+
     }
 
     // CREATE BLOG
@@ -115,8 +115,8 @@ class BlogController extends Controller
         try{
 
             $blog = Blog::with('category')->find($id);
-        
-        
+
+
         if(!$id){
             return(response()->json([
                 'status'=>'error',
@@ -148,7 +148,7 @@ class BlogController extends Controller
         // UPDATE BLOG
     public function blogUpdates(Request $request, $id){
         try{
-        
+
         $blog = Blog::find($id);
         if(!$blog){
             return response()->json([
@@ -203,7 +203,7 @@ class BlogController extends Controller
         try{
 
         $blog = Blog::find($id);
-        
+
         if(!$blog){
             return response()->json([
                 'status' => 'error',
@@ -222,7 +222,7 @@ class BlogController extends Controller
                 'type' => 'not_found',
                 'message' => 'Blog not found'
             ], 404);
-        
+
             }catch(\Exception $e){
             return response()->json([
                 'status' => 'error',
@@ -230,6 +230,6 @@ class BlogController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
-        
+
     }
 }
