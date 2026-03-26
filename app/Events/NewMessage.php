@@ -45,6 +45,7 @@ class NewMessage implements ShouldBroadcast
                 'id' => $this->message->message_id,
                 'chatroom_id' => $this->message->chatroom_id,
                 'messages' => $this->message->messages,
+                'sender' => $this->message->sender ?? 'user',
                 'status' => $this->message->status,
                 'cart_id' => $this->message->cart_id,
                 'created_at' => optional($this->message->created_at)->toDateTimeString(),

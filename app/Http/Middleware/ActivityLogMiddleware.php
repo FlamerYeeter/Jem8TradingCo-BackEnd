@@ -79,9 +79,37 @@ class ActivityLogMiddleware
         $category   = $this->detectCategory($resource, $path);
         $description = $this->buildDescription($user, $method, $resource, $resourceId, $request);
 
+        // Prevent duplicate logs for identical actions in a short window
+        $referenceTable = $resource ? str_replace('-', '_', $resource) : null;
+        $referenceId = $resourceId ?? $this->extractIdFromResponse($response);
+
+        $recentCutoff = now()->subSeconds(30);
+
+        $duplicateQuery = ActivityLog::where('user_id', $user->id)
+            ->where('action', $action)
+            ->where('category', $category)
+            ->where('description', $description)
+            ->where('logged_at', '>=', $recentCutoff);
+
+        if ($referenceTable !== null) {
+            $duplicateQuery->where('reference_table', $referenceTable);
+        } else {
+            $duplicateQuery->whereNull('reference_table');
+        }
+
+        if ($referenceId !== null) {
+            $duplicateQuery->where('reference_id', $referenceId);
+        } else {
+            $duplicateQuery->whereNull('reference_id');
+        }
+
+        if ($duplicateQuery->exists()) {
+            return; // already logged recently
+        }
+
         ActivityLog::log($user, $action, $category, [
-            'reference_table'     => $resource ? str_replace('-', '_', $resource) : null,
-            'reference_id'        => $resourceId ?? $this->extractIdFromResponse($response),
+            'reference_table'     => $referenceTable,
+            'reference_id'        => $referenceId,
             'product_unique_code' => $request->input('order_code') ?? $request->input('product_unique_code') ?? null,
             'mode_of_payment'     => $request->input('payment_method') ?? $request->input('mode_of_payment') ?? null,
             'amount'              => $request->input('amount') ?? $request->input('paid_amount') ?? null,
