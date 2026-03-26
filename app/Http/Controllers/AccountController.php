@@ -11,7 +11,6 @@ use App\Mail\VerificationCodeMail;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Auth;
 
-
 class AccountController extends Controller
 {
     // ==============================
@@ -23,7 +22,7 @@ class AccountController extends Controller
     }
 
     // ==============================
-    // REGISTER
+    // REGISTER ✅ logged
     // ==============================
     public function store(Request $request)
     {
@@ -43,31 +42,29 @@ class AccountController extends Controller
             'password'     => Hash::make($validated['password']),
         ]);
 
-        // Generate 6-digit verification code
         $code = rand(100000, 999999);
-
         $account->update([
-            'email_verification_code' => $code,
+            'email_verification_code'       => $code,
             'email_verification_expires_at' => now()->addMinutes(10),
         ]);
 
         Mail::to($account->email)->send(new VerificationCodeMail($code));
 
+        // ✅ Log: new account registered
         ActivityLog::log($account, 'Registered an account', 'account', [
-        'description'     => $account->first_name . ' ' . $account->last_name . ' created a new account',
-        'reference_table' => 'accounts',
-        'reference_id'    => $account->id,
+            'description'     => $account->first_name . ' ' . $account->last_name . ' created a new account',
+            'reference_table' => 'accounts',
+            'reference_id'    => $account->id,
         ]);
-
 
         return response()->json([
             'message' => 'Account created. Please verify your email.',
-            'data' => $account
+            'data'    => $account
         ], 201);
     }
 
     // ==============================
-    // LOGIN
+    // LOGIN ✅ logged
     // ==============================
     public function login(Request $request)
     {
@@ -88,65 +85,51 @@ class AccountController extends Controller
 
         $token = $account->createToken('jem8_token')->plainTextToken;
 
+        // ✅ Log: user logged in
         ActivityLog::log($account, 'Logged in', 'account', [
-            'description' => $account->first_name . ' ' . $account->last_name . ' logged in ',
+            'description'     => $account->first_name . ' ' . $account->last_name . ' logged in',
             'reference_table' => 'accounts',
-            'reference_id' => $account->id,
-            ]);
+            'reference_id'    => $account->id,
+        ]);
 
-        // Set cookie properly
-        $cookie = cookie(
-            'jem8_token', 
-            $token, 
-            60*24*30,   // 30 days
-            '/',        // path
-            null,       // domain null for localhost
-            true,      // secure false for local dev
-            true,       // httpOnly
-            false,      // raw
-            'None'       // sameSite safe for local dev
-        );
+        $cookie = cookie('jem8_token', $token, 60 * 24 * 30, '/', null, true, true, false, 'None');
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Login successful',
         ])->withCookie($cookie);
     }
-        // ==============================
-    // LOGOUT
+
+    // ==============================
+    // LOGOUT ✅ logged
     // ==============================
     public function logout(Request $request)
     {
         $user = $request->user();
 
         if ($user) {
+            // ✅ Log BEFORE logging out
+            ActivityLog::log($user, 'Logged out', 'account', [
+                'description'     => $user->first_name . ' ' . $user->last_name . ' logged out',
+                'reference_table' => 'accounts',
+                'reference_id'    => $user->id,
+            ]);
 
-            // Delete token only if it exists
             if ($request->user()->currentAccessToken()) {
                 $request->user()->currentAccessToken()->delete();
             }
         }
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Logged out successfully',
         ])->withCookie(
-            cookie(
-                'jem8_token',
-                '',
-                -1,           // Expire immediately
-                '/',          // MUST match path
-                null,         // MUST match domain
-                true,         // MUST match secure
-                true,         // httpOnly
-                false,
-                'None'        // MUST match SameSite
-            )
+            cookie('jem8_token', '', -1, '/', null, true, true, false, 'None')
         );
     }
 
     // ==============================
-    // VERIFY EMAIL
+    // VERIFY EMAIL — no log needed
     // ==============================
     public function verifyEmail(Request $request)
     {
@@ -173,52 +156,42 @@ class AccountController extends Controller
         }
 
         $account->update([
-            'email_verified_at' => now(),
-            'email_verification_code' => null,
+            'email_verified_at'             => now(),
+            'email_verification_code'       => null,
             'email_verification_expires_at' => null,
         ]);
 
         return response()->json(['message' => 'Email verified successfully']);
     }
 
+    // ==============================
+    // SHOW ACCOUNT — no log needed
+    // ==============================
     public function show($id)
     {
         try {
-
             $account = Account::findOrFail($id);
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $account
-            ], 200);
-
+            return response()->json(['status' => 'success', 'data' => $account], 200);
         } catch (\Exception $e) {
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Account not found'
-            ], 404);
-
+            return response()->json(['status' => 'error', 'message' => 'Account not found'], 404);
         }
     }
 
     // ==============================
-    // FORGOT PASSWORD
+    // FORGOT PASSWORD — no log needed
     // ==============================
     public function forgotPassword(Request $request)
     {
         $request->validate(['email' => 'required|email']);
 
         $account = Account::where('email', $request->email)->first();
-
         if (!$account) {
             return response()->json(['message' => 'Account not found'], 404);
         }
 
         $code = rand(100000, 999999);
-
         $account->update([
-            'password_reset_code' => $code,
+            'password_reset_code'       => $code,
             'password_reset_expires_at' => now()->addMinutes(15),
         ]);
 
@@ -228,7 +201,7 @@ class AccountController extends Controller
     }
 
     // ==============================
-    // RESET PASSWORD
+    // RESET PASSWORD — no log needed
     // ==============================
     public function resetPassword(Request $request)
     {
@@ -239,7 +212,6 @@ class AccountController extends Controller
         ]);
 
         $account = Account::where('email', $request->email)->first();
-
         if (!$account) {
             return response()->json(['message' => 'Account not found'], 404);
         }
@@ -252,8 +224,8 @@ class AccountController extends Controller
         }
 
         $account->update([
-            'password' => Hash::make($request->password),
-            'password_reset_code' => null,
+            'password'                  => Hash::make($request->password),
+            'password_reset_code'       => null,
             'password_reset_expires_at' => null,
         ]);
 
@@ -261,38 +233,34 @@ class AccountController extends Controller
     }
 
     // ==============================
-    // VIEW AUTHENTICATED USER
+    // VIEW AUTHENTICATED USER — no log needed
     // ==============================
     public function me(Request $request)
     {
         $user = $request->user();
 
         if (!$user) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Unauthenticated'
-            ], 401);
+            return response()->json(['status' => 'failed', 'message' => 'Unauthenticated'], 401);
         }
 
         return response()->json([
             'status' => 'success',
-            'data' => [
-                'id'            => $user->id,
-                'first_name'    => $user->first_name,
-                'last_name'     => $user->last_name,
-                'phone_number'  => $user->phone_number,
-                'email'         => $user->email,
-                'profile_image' => $user->profile_image 
-                    ? asset('storage/' . $user->profile_image)
-                    : null,
+            'data'   => [
+                'id'                => $user->id,
+                'first_name'        => $user->first_name,
+                'last_name'         => $user->last_name,
+                'phone_number'      => $user->phone_number,
+                'email'             => $user->email,
+                'role'              => $user->role,
+                'profile_image'     => $user->profile_image ? asset('storage/' . $user->profile_image) : null,
                 'email_verified_at' => $user->email_verified_at,
-                'created_at'    => $user->created_at,
+                'created_at'        => $user->created_at,
             ]
         ]);
     }
 
     // ==============================
-    // UPDATE PROFILE DETAILS
+    // UPDATE PROFILE — no log needed
     // ==============================
     public function updateProfile(Request $request)
     {
@@ -307,14 +275,11 @@ class AccountController extends Controller
 
         $user->update($validated);
 
-        return response()->json([
-            'message' => 'Profile updated successfully',
-            'data' => $user
-        ]);
+        return response()->json(['message' => 'Profile updated successfully', 'data' => $user]);
     }
 
     // ==============================
-    // UPDATE PROFILE IMAGE
+    // UPDATE PROFILE IMAGE — no log needed
     // ==============================
     public function updateProfileImage(Request $request)
     {
@@ -324,30 +289,34 @@ class AccountController extends Controller
 
         $user = $request->user();
 
-        // Delete old image
         if ($user->profile_image) {
             Storage::disk('public')->delete($user->profile_image);
         }
 
-        $path = $request->file('profile_image')
-            ->store('profile_images', 'public');
-
-        $user->update([
-            'profile_image' => $path
-        ]);
+        $path = $request->file('profile_image')->store('profile_images', 'public');
+        $user->update(['profile_image' => $path]);
 
         return response()->json([
-            'message' => 'Profile image updated successfully',
+            'message'           => 'Profile image updated successfully',
             'profile_image_url' => asset('storage/' . $path)
         ]);
     }
 
     // ==============================
-    // DELETE ACCOUNT
+    // DELETE OWN ACCOUNT ✅ logged
     // ==============================
     public function destroy(Request $request)
     {
         $user = $request->user();
+        $name = $user->first_name . ' ' . $user->last_name;
+        $id   = $user->id;
+
+        // ✅ Log BEFORE deleting
+        ActivityLog::log($user, 'Deleted account', 'account', [
+            'description'     => $name . ' deleted their account',
+            'reference_table' => 'accounts',
+            'reference_id'    => $id,
+        ]);
 
         if ($user->profile_image) {
             Storage::disk('public')->delete($user->profile_image);
@@ -356,8 +325,44 @@ class AccountController extends Controller
         $user->tokens()->delete();
         $user->delete();
 
-        return response()->json([
-            'message' => 'Account deleted successfully'
+        return response()->json(['message' => 'Account deleted successfully']);
+    }
+
+    // ==============================
+    // ADMIN UPDATE ACCOUNT — no log needed
+    // ==============================
+    public function update(Request $request, $id)
+    {
+        $account = Account::findOrFail($id);
+
+        $account->update($request->only([
+            'first_name',
+            'last_name',
+            'email',
+            'phone_number',
+            'role',
+        ]));
+
+        return response()->json(['data' => $account]);
+    }
+
+    // ==============================
+    // ADMIN DELETE ACCOUNT ✅ logged
+    // ==============================
+    public function adminDestroy($id)
+    {
+        $account = Account::findOrFail($id);
+        $name    = $account->first_name . ' ' . $account->last_name;
+
+        // ✅ Log: admin deleted an account
+        ActivityLog::log(Auth::user(), 'Deleted an account', 'account', [
+            'description'     => Auth::user()->first_name . ' deleted account of: ' . $name,
+            'reference_table' => 'accounts',
+            'reference_id'    => $id,
         ]);
+
+        $account->delete();
+
+        return response()->json(['message' => 'Account deleted successfully.']);
     }
 }

@@ -3,135 +3,61 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\admin_leadership;
+use App\Models\admin_backup;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
-class AdminLeadershipController extends Controller
+class AdminBackupController extends Controller
 {
-    // GET ALL LEADERSHIP
-    public function adminImgIndex(Request $request)
-    {
-        try {
-            $query = admin_leadership::query();
-
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
-            }
-
-            $leaderships = $query->get();
-
-            // ✅ Log: viewed leadership list
-            ActivityLog::log(Auth::user(), 'Viewed leadership list', 'account', [
-                'description'     => Auth::user()->first_name . ' viewed the leadership list',
-                'reference_table' => 'admin_leaderships',
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'data'   => $leaderships
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'type' => 'server', 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    // CREATE LEADERSHIP
-    public function adminImgStore(Request $request)
+    // ✅ POST - Run Backup
+    public function adminRunBackup(Request $request)
     {
         try {
             $request->validate([
-                'name'           => 'required|string|max:255',
-                'position'       => 'required|string|max:255',
-                'status'         => 'required|boolean',
-                'leadership_img' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+                'backup_type' => 'required|integer|in:1,2,3',
             ]);
 
-            $imagePath = null;
+            $timestamp = now()->format('Ymd_His');
+            $typeNames = [
+                admin_backup::TYPE_DATABASE => 'db',
+                admin_backup::TYPE_FILES    => 'files',
+                admin_backup::TYPE_FULL     => 'full',
+            ];
 
-            if ($request->hasFile('leadership_img')) {
-                $uploadPath = public_path('storage/leadership_imgs');
-                if (!file_exists($uploadPath)) {
-                    mkdir($uploadPath, 0777, true);
-                }
-                $filename  = time() . '_' . uniqid() . '.' . $request->file('leadership_img')->getClientOriginalExtension();
-                $request->file('leadership_img')->move($uploadPath, $filename);
-                $imagePath = 'leadership_imgs/' . $filename;
+            $typeName   = $typeNames[$request->backup_type];
+            $ext        = $request->backup_type == admin_backup::TYPE_DATABASE ? 'sql' : 'zip';
+            $fileName   = "backup_{$typeName}_{$timestamp}.{$ext}";
+            $backupPath = "backups/{$fileName}";
+            $fullPath   = storage_path("app/public/{$backupPath}");
+
+            \Storage::disk('public')->makeDirectory('backups');
+
+            if ($request->backup_type == admin_backup::TYPE_DATABASE) {
+                $this->exportDatabase($fullPath);
+            } elseif ($request->backup_type == admin_backup::TYPE_FILES) {
+                $this->exportFiles($fullPath);
+            } elseif ($request->backup_type == admin_backup::TYPE_FULL) {
+                $this->exportFull($fullPath);
             }
 
-            $leadership = admin_leadership::create([
-                'name'           => $request->name,
-                'position'       => $request->position,
-                'status'         => $request->status,
-                'leadership_img' => $imagePath,
+            $backup = admin_backup::create([
+                'backup_type' => $request->backup_type,
+                'backup_size' => file_exists($fullPath) ? filesize($fullPath) : 0,
+                'status'      => file_exists($fullPath) ? 'completed' : 'failed',
+                'file_name'   => $fileName,
+                'backup_path' => $backupPath,
             ]);
 
-            // ✅ Log: created leadership
-            ActivityLog::log(Auth::user(), 'Added a leadership member', 'account', [
-                'description'     => Auth::user()->first_name . ' added leadership member: ' . $request->name . ' as ' . $request->position,
-                'reference_table' => 'admin_leaderships',
-                'reference_id'    => $leadership->id,
+            // ✅ Log: backup created
+            ActivityLog::log(Auth::user(), 'Created a backup', 'backups', [
+                'product_unique_code' => $fileName,
+                'description'         => Auth::user()->first_name . ' created a ' . $typeName . ' backup: ' . $fileName,
+                'reference_table'     => 'admin_backups',
+                'reference_id'        => $backup->id,
             ]);
 
-            return response()->json([
-                'status'    => 'success',
-                'data'      => $leadership,
-                'image_url' => asset('storage/' . $imagePath)
-            ], 201);
+            return response()->json(['status' => 'success', 'data' => $backup], 200);
 
-        } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    // UPDATE LEADERSHIP
-    public function adminImgUpdate(Request $request, $id)
-    {
-        try {
-            $leadership = admin_leadership::findOrFail($id);
-
-            $request->validate([
-                'name'           => 'sometimes|string|max:255',
-                'position'       => 'sometimes|string|max:255',
-                'status'         => 'sometimes|boolean',
-                'leadership_img' => 'sometimes|image|mimes:jpeg,png,jpg|max:2048',
-            ]);
-
-            $data = $request->only(['name', 'position', 'status']);
-
-            if ($request->hasFile('leadership_img')) {
-                $uploadPath = public_path('storage/leadership_imgs');
-                if (!file_exists($uploadPath)) {
-                    mkdir($uploadPath, 0777, true);
-                }
-                if ($leadership->leadership_img) {
-                    $oldPath = public_path('storage/' . $leadership->leadership_img);
-                    if (file_exists($oldPath)) unlink($oldPath);
-                }
-                $filename          = time() . '_' . uniqid() . '.' . $request->file('leadership_img')->getClientOriginalExtension();
-                $request->file('leadership_img')->move($uploadPath, $filename);
-                $data['leadership_img'] = 'leadership_imgs/' . $filename;
-            }
-
-            $leadership->update($data);
-
-            // ✅ Log: updated leadership
-            ActivityLog::log(Auth::user(), 'Updated a leadership member', 'account', [
-                'description'     => Auth::user()->first_name . ' updated leadership member: ' . $leadership->name,
-                'reference_table' => 'admin_leaderships',
-                'reference_id'    => $id,
-            ]);
-
-            return response()->json([
-                'status'    => 'success',
-                'data'      => $leadership,
-                'image_url' => $leadership->leadership_img ? asset('storage/' . $leadership->leadership_img) : null
-            ], 200);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json(['status' => 'error', 'type' => 'not_found', 'message' => 'Leadership entry not found'], 404);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(['status' => 'error', 'type' => 'validation', 'message' => $e->errors()], 422);
         } catch (\Exception $e) {
@@ -139,32 +65,161 @@ class AdminLeadershipController extends Controller
         }
     }
 
-    // DELETE LEADERSHIP
-    public function adminImgDelete($id)
+    // ✅ GET - Backup History
+    public function adminHistoryBackup()
     {
         try {
-            $leadership = admin_leadership::findOrFail($id);
-            $name       = $leadership->name;
+            $backups = admin_backup::orderBy('created_at', 'desc')->get();
 
-            if ($leadership->leadership_img) {
-                Storage::disk('public')->delete($leadership->leadership_img);
-            }
-
-            $leadership->delete();
-
-            // ✅ Log: deleted leadership
-            ActivityLog::log(Auth::user(), 'Deleted a leadership member', 'account', [
-                'description'     => Auth::user()->first_name . ' deleted leadership member: ' . $name,
-                'reference_table' => 'admin_leaderships',
-                'reference_id'    => $id,
+            // ✅ Log: viewed backup history
+            ActivityLog::log(Auth::user(), 'Viewed backup history', 'backups', [
+                'description'     => Auth::user()->first_name . ' viewed the backup history',
+                'reference_table' => 'admin_backups',
             ]);
 
-            return response()->json(['status' => 'success', 'message' => 'Leadership entry deleted successfully'], 200);
+            return response()->json(['status' => 'success', 'data' => $backups], 200);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json(['status' => 'error', 'type' => 'not_found', 'message' => 'Leadership entry not found'], 404);
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'type' => 'server', 'message' => $e->getMessage()], 500);
         }
+    }
+
+    // ✅ GET - Download Backup
+    public function adminDownloadBackup($id)
+    {
+        try {
+            $backup   = admin_backup::findOrFail($id);
+            $fullPath = storage_path('app/public/' . $backup->backup_path);
+
+            if (!file_exists($fullPath)) {
+                return response()->json(['status' => 'error', 'message' => 'Backup file not found'], 404);
+            }
+
+            // ✅ Log: downloaded backup
+            ActivityLog::log(Auth::user(), 'Downloaded a backup', 'backups', [
+                'product_unique_code' => $backup->file_name,
+                'description'         => Auth::user()->first_name . ' downloaded backup: ' . $backup->file_name,
+                'reference_table'     => 'admin_backups',
+                'reference_id'        => $id,
+            ]);
+
+            return response()->download($fullPath, $backup->file_name);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['status' => 'error', 'type' => 'not_found', 'message' => 'Backup record not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'type' => 'server', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // ✅ DELETE - Delete Backup
+    public function adminDeleteBackup($id)
+    {
+        try {
+            $backup   = admin_backup::findOrFail($id);
+            $fileName = $backup->file_name;
+
+            $backup->delete();
+
+            // ✅ Log: deleted backup
+            ActivityLog::log(Auth::user(), 'Deleted a backup', 'backups', [
+                'product_unique_code' => $fileName,
+                'description'         => Auth::user()->first_name . ' deleted backup: ' . $fileName,
+                'reference_table'     => 'admin_backups',
+                'reference_id'        => $id,
+            ]);
+
+            return response()->json(['status' => 'success', 'message' => 'Backup deleted successfully'], 200);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['status' => 'error', 'type' => 'not_found', 'message' => 'Backup record not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'type' => 'server', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // ✅ POST - Upload & Restore
+    public function adminUploadRestore(Request $request)
+    {
+        try {
+            $request->validate([
+                'backup_file' => 'required|file|mimes:txt,zip,x-sql|max:51200',
+            ]);
+
+            $file     = $request->file('backup_file');
+            $fullPath = storage_path('app/public/backups/' . $file->getClientOriginalName());
+
+            $file->move(storage_path('app/public/backups'), $file->getClientOriginalName());
+
+            if ($file->getClientOriginalExtension() == 'sql') {
+                $db       = config('database.connections.mysql.database');
+                $user     = config('database.connections.mysql.username');
+                $password = config('database.connections.mysql.password');
+                $host     = config('database.connections.mysql.host');
+
+                $pdo = new \PDO("mysql:host={$host};dbname={$db}", $user, $password);
+                $sql = file_get_contents($fullPath);
+                $pdo->exec($sql);
+            }
+
+            // ✅ Log: restored backup
+            ActivityLog::log(Auth::user(), 'Restored a backup', 'backups', [
+                'product_unique_code' => $file->getClientOriginalName(),
+                'description'         => Auth::user()->first_name . ' restored backup: ' . $file->getClientOriginalName(),
+                'reference_table'     => 'admin_backups',
+            ]);
+
+            return response()->json(['status' => 'success', 'message' => 'Backup restored successfully'], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['status' => 'error', 'type' => 'validation', 'message' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'type' => 'server', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // ✅ Private helpers (unchanged)
+    private function exportDatabase($fullPath)
+    {
+        $db        = config('database.connections.mysql.database');
+        $user      = config('database.connections.mysql.username');
+        $password  = config('database.connections.mysql.password');
+        $host      = config('database.connections.mysql.host');
+        $mysqldump = 'C:\\xampp\\mysql\\bin\\mysqldump';
+        exec("{$mysqldump} --user={$user} --password={$password} --host={$host} {$db} -r \"{$fullPath}\"");
+    }
+
+    private function exportFiles($fullPath)
+    {
+        $zip    = new \ZipArchive();
+        $source = storage_path('app/public');
+        if ($zip->open($fullPath, \ZipArchive::CREATE) === true) {
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($source));
+            foreach ($files as $file) {
+                if (!$file->isDir()) {
+                    $zip->addFile($file->getPathname(), str_replace($source . DIRECTORY_SEPARATOR, '', $file->getPathname()));
+                }
+            }
+            $zip->close();
+        }
+    }
+
+    private function exportFull($fullPath)
+    {
+        $zip     = new \ZipArchive();
+        $source  = storage_path('app/public');
+        $tempSql = storage_path('app/public/backups/temp_db.sql');
+        $this->exportDatabase($tempSql);
+        if ($zip->open($fullPath, \ZipArchive::CREATE) === true) {
+            $zip->addFile($tempSql, 'database.sql');
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($source));
+            foreach ($files as $file) {
+                if (!$file->isDir()) {
+                    $zip->addFile($file->getPathname(), str_replace($source . DIRECTORY_SEPARATOR, '', $file->getPathname()));
+                }
+            }
+            $zip->close();
+        }
+        if (file_exists($tempSql)) unlink($tempSql);
     }
 }

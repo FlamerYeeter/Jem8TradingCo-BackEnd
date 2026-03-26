@@ -43,7 +43,7 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/me', [AccountController::class, 'me']);
     Route::post('/profile/update', [AccountController::class, 'updateProfile']);
     Route::post('/profile/update-image', [AccountController::class, 'updateProfileImage']);
-    Route::delete('/delete-account', [AccountController::class, 'destroy']);
+Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::post('/logout', [AccountController::class, 'logout']);
 
     Route::get('/leadership', [AdminLeadershipController::class, 'adminImgIndex']);
@@ -149,7 +149,7 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::post('activity-logs',                 [ActivityLogController::class, 'storeLogs']);
     Route::get('activity-logs/{activityLog}',    [ActivityLogController::class, 'showLogs']);
     Route::put('activity-logs/{activityLog}',    [ActivityLogController::class, 'updateLogs']);
-    Route::delete('activity-logs',               [ActivityLogController::class, 'destroyAllLogs']);
+    Route::delete('activity-logs',               [ActivityLogController::class, 'delallLogs']);
     Route::delete('activity-logs/{activityLog}', [ActivityLogController::class, 'destroyLogs']);
     });
 
@@ -167,6 +167,9 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
     Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
     Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+
+
+    Route::put('/accounts/{id}', [AccountController::class, 'update']);
 
 
 });

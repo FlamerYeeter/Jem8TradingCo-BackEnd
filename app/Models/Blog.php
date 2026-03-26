@@ -25,7 +25,7 @@ class Blog extends Model
     ];
 
     protected $casts = [
-        
+
         'update_at' => 'datetime',
     ];
 
