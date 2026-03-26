@@ -13,7 +13,7 @@ return new class extends Migration
     {
         if (!Schema::hasTable('product_images')) {
         Schema::create('product_images', function (Blueprint $table) {
-            $table->id();
+            $table->image_id();
             $table->unsignedBigInteger('product_id'); // FK to products
             $table->string('image_path'); // store image filename/path
             $table->timestamps();

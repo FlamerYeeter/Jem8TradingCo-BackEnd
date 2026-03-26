@@ -1,2 +1,2 @@
-*
+mv storage/app/products storage/app/public/products*
 !.gitignore
