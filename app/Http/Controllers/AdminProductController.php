@@ -262,8 +262,8 @@ class AdminProductController extends Controller
             if ($request->has('set_primary_image')) {
                 $product->images()->update(['is_primary' => false]);
                 ProductImage::where('image_id', $request->set_primary_image)
-                           ->where('product_id', $product->product_id)
-                           ->update(['is_primary' => true]);
+                        ->where('product_id', $product->product_id)
+                        ->update(['is_primary' => true]);
             }
 
             // If no primary image, set first as primary

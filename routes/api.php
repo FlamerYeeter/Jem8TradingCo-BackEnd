@@ -17,7 +17,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\AdminLeadershipController;
 use App\Http\Controllers\Dashboard;
-
+use App\Http\Controllers\ActivityLogController;
 
 
 // Public routes
@@ -137,10 +137,15 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
 
     // Chat
 
-    //Activity Log
-    // Route::prefix('admin')->group(function(){
-    //     Route::get
-    // });
+    // Activity Log
+    Route::prefix('admin')->group(function(){
+    Route::get('activity-logs',                  [ActivityLogController::class, 'logFetch']);
+    Route::post('activity-logs',                 [ActivityLogController::class, 'storeLogs']);
+    Route::get('activity-logs/{activityLog}',    [ActivityLogController::class, 'showLogs']);
+    Route::put('activity-logs/{activityLog}',    [ActivityLogController::class, 'updateLogs']);
+    Route::delete('activity-logs',               [ActivityLogController::class, 'destroyAllLogs']);
+    Route::delete('activity-logs/{activityLog}', [ActivityLogController::class, 'destroyLogs']);
+    });
 
 });
 
@@ -156,4 +161,6 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
     Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
     Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+
+
 });

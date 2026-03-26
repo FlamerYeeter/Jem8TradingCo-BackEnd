@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use App\Mail\VerificationCodeMail;
+use App\Models\ActivityLog;
+use Illuminate\Support\Facades\Auth;
+
 
 class AccountController extends Controller
 {
@@ -50,6 +53,13 @@ class AccountController extends Controller
 
         Mail::to($account->email)->send(new VerificationCodeMail($code));
 
+        ActivityLog::log($account, 'Registered an account', 'account', [
+        'description'     => $account->first_name . ' ' . $account->last_name . ' created a new account',
+        'reference_table' => 'accounts',
+        'reference_id'    => $account->id,
+        ]);
+
+
         return response()->json([
             'message' => 'Account created. Please verify your email.',
             'data' => $account
@@ -77,6 +87,12 @@ class AccountController extends Controller
         }
 
         $token = $account->createToken('jem8_token')->plainTextToken;
+
+        ActivityLog::log($account, 'Logged in', 'account', [
+            'description' => $account->first_name . ' ' . $account->last_name . ' logged in ',
+            'reference_table' => 'accounts',
+            'reference_id' => $account->id,
+            ]);
 
         // Set cookie properly
         $cookie = cookie(

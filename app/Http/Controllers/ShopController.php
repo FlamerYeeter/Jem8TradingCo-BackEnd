@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use App\Models\Cart;
 use App\Models\Product;
 use App\Models\ProductImage;
+use Illuminate\Support\Facades\Auth;
 
 class ShopController extends Controller
 {
@@ -33,6 +35,14 @@ class ShopController extends Controller
             'product_id' => $request->product_id,
             'total'      => floatval($product->price) * intval($request->quantity),
             'status'     => 'pending',
+        ]);
+
+        ActivityLog::log($user, 'added product to cart', 'orders', [
+                'product_name'    => $product->product_name,
+                'amount'          => $cart->total,
+                'description'     => $user->name . ' added ' . $product->product_name . ' x' . $request->quantity . ' to cart',
+                'reference_table' => 'carts',
+                'reference_id'    => $cart->id,
         ]);
 
         return response()->json([
@@ -93,6 +103,15 @@ class ShopController extends Controller
             'image' => $imagePath
         ]);
 
+         ActivityLog::log(Auth::user(), 'Added a product', 'stock', [
+                'product_name'        => $product->product_name,
+                'product_unique_code' => 'PRD-' . $product->product_id,
+                'amount'              => $product->price,
+                'description'         => Auth::user()->name . ' added product: ' . $product->product_name . ' (Stocks: ' . $product->product_stocks . ')',
+                'reference_table'     => 'products',
+                'reference_id'        => $product->product_id,
+            ]);
+
         return response()->json([
             'message' => 'Product added successfully',
             'data' => $product
@@ -127,6 +146,16 @@ class ShopController extends Controller
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
         }
+
+        if (Auth::check()) {
+                ActivityLog::log(Auth::user(), 'Viewed a product', 'stock', [
+                    'product_name'        => $product->product_name,
+                    'product_unique_code' => 'PRD-' . $product->product_id,
+                    'description'         => Auth::user()->first_name . ' viewed product: ' . $product->product_name,
+                    'reference_table'     => 'products',
+                    'reference_id'        => $product->product_id,
+                ]);
+            }
 
         return response()->json([
             'product' => $product,
