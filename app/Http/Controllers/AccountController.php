@@ -96,8 +96,8 @@ class AccountController extends Controller
 
         // Set cookie properly
         $cookie = cookie(
-            'jem8_token', 
-            $token, 
+            'jem8_token',
+            $token,
             60*24*30,   // 30 days
             '/',        // path
             null,       // domain null for localhost
@@ -282,7 +282,7 @@ class AccountController extends Controller
                 'last_name'     => $user->last_name,
                 'phone_number'  => $user->phone_number,
                 'email'         => $user->email,
-                'profile_image' => $user->profile_image 
+                'profile_image' => $user->profile_image
                     ? asset('storage/' . $user->profile_image)
                     : null,
                 'email_verified_at' => $user->email_verified_at,
@@ -360,4 +360,28 @@ class AccountController extends Controller
             'message' => 'Account deleted successfully'
         ]);
     }
+    // Update account (admin)
+public function update(Request $request, $id)
+{
+    $account = Account::findOrFail($id);
+
+    $account->update($request->only([
+        'first_name',
+        'last_name',
+        'email',
+        'phone_number',
+        'role',
+    ]));
+
+    return response()->json(['data' => $account]);
+}
+
+// Delete account by ID (admin)
+public function adminDestroy($id)
+{
+    $account = Account::findOrFail($id);
+    $account->delete();
+
+    return response()->json(['message' => 'Account deleted successfully.']);
+}
 }

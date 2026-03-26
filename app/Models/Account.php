@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string $phone_number
  * @property string $email
  * @property string $password
+ * @property string $role
  * @property string|null $email_verification_code
  * @property string|null $email_verification_expires_at
  * @property string|null $password_reset_code
@@ -55,12 +56,13 @@ class Account extends Authenticatable
         'phone_number',
         'email',
         'password',
+        'role',                          // ← ADDED: allows role to be mass-assigned
         'email_verification_code',
         'email_verification_expires_at',
         'password_reset_code',
         'password_reset_expires_at',
         'email_verified_at',
-        'profile_image'
+        'profile_image',
     ];
 
     protected $hidden = [
