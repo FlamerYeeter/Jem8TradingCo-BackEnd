@@ -22,6 +22,7 @@ class ActivityLog extends Model
         'product_unique_code',
         'mode_of_payment',
         'amount',
+        'meta',
         'reference_table',
         'reference_id',
         'description',
@@ -32,6 +33,7 @@ class ActivityLog extends Model
         'amount'     => 'decimal:2',
         'logged_at'  => 'datetime',
         'created_at' => 'datetime',
+        'meta'       => 'array',
     ];
 
     public function account()
