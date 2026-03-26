@@ -24,8 +24,10 @@ class Message extends Model
      */
     protected $fillable = [
         'chatroom_id',
+        'user_id',
         'messages',
         'status',
+        'sender',
         'cart_id',
     ];
 
@@ -35,5 +37,13 @@ class Message extends Model
     public function chatRoom()
     {
         return $this->belongsTo(LiveChat::class, 'chatroom_id', 'chatroom_id');
+    }
+
+    /**
+     * Get the user that sent this message.
+     */
+    public function user()
+    {
+        return $this->belongsTo(Account::class, 'user_id');
     }
 }

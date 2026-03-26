@@ -6,6 +6,7 @@ use App\Events\NewMessage;
 use App\Models\Message;
 use App\Models\LiveChat;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ChatController extends Controller
 {
@@ -20,9 +21,14 @@ class ChatController extends Controller
             return response()->json(['message' => 'chatroom_id required'], 400);
         }
 
-        $messages = Message::where('chatroom_id', $chatroomId)
+        $messages = Message::with('user:id,first_name,last_name,profile_image')
+            ->where('chatroom_id', $chatroomId)
             ->orderBy('created_at', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($m) {
+                $m->is_me = optional(auth())->id() && $m->user_id == auth()->id();
+                return $m;
+            });
 
         return response()->json($messages);
     }
@@ -36,9 +42,17 @@ class ChatController extends Controller
             'chatroom_id' => 'required|integer',
             'messages' => 'required|string',
             'status' => 'nullable|integer',
+            'sender' => 'nullable|string',
+            'user_id' => 'nullable|integer',
             'cart_id' => 'nullable|integer',
         ]);
 
+        // Set user_id from authenticated user if available, otherwise accept provided user_id.
+        if (! isset($data['user_id']) || ! $data['user_id']) {
+            $data['user_id'] = Auth::id();
+        }
+
+        // If no sender provided, default will be applied by DB migration ('user').
         $message = Message::create($data);
 
         event(new NewMessage($message));
@@ -61,6 +75,13 @@ class ChatController extends Controller
         } else {
             $messages = $query->get();
         }
+
+        // include sender account and mark which messages belong to current user
+        $messages = $messages->load('user:id,first_name,last_name,profile_image')
+            ->map(function ($m) {
+                $m->is_me = optional(auth())->id() && $m->user_id == auth()->id();
+                return $m;
+            });
 
         return response()->json($messages);
     }
