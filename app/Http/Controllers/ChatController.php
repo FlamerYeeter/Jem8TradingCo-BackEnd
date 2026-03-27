@@ -47,10 +47,8 @@ class ChatController extends Controller
             'cart_id' => 'nullable|integer',
         ]);
 
-        // Set user_id from authenticated user if available, otherwise accept provided user_id.
-        if (! isset($data['user_id']) || ! $data['user_id']) {
-            $data['user_id'] = Auth::id();
-        }
+        // Enforce the authenticated user as the message author to prevent spoofing.
+        $data['user_id'] = Auth::id();
 
         // If no sender provided, default will be applied by DB migration ('user').
         $message = Message::create($data);
@@ -92,6 +90,7 @@ class ChatController extends Controller
     public function rooms()
     {
         $rooms = LiveChat::withCount('messages')
+            ->where('user_id', Auth::id())
             ->orderBy('chatroom_id', 'asc')
             ->get();
 
@@ -104,8 +103,9 @@ class ChatController extends Controller
     public function roomsSummary()
     {
         $rooms = LiveChat::with(['user:id,first_name,last_name,profile_image', 'messages' => function ($q) {
-                $q->orderBy('created_at', 'desc')->limit(1);
+            $q->orderBy('created_at', 'desc')->limit(1);
             }])
+            ->where('user_id', Auth::id())
             ->withCount('messages')
             ->orderBy('chatroom_id', 'desc')
             ->get()

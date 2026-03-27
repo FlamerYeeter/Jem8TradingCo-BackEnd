@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class ActivityLog extends Model
 {
@@ -61,12 +62,24 @@ class ActivityLog extends Model
             $name = $user->email ?? 'Unknown';
         }
 
-        return self::create(array_merge([
+        $data = array_merge([
             'user_id'   => $user->id,
             'user_name' => $name,
             'action'    => $action,
             'category'  => $category,
             'logged_at' => now(),
-        ], $extra));
+        ], $extra);
+
+        // Filter to only columns that actually exist in the table to avoid SQL errors
+        try {
+            $columns = Schema::getColumnListing((new self())->getTable());
+            $data = array_filter($data, function ($value, $key) use ($columns) {
+                return in_array($key, $columns, true);
+            }, ARRAY_FILTER_USE_BOTH);
+        } catch (\Exception $e) {
+            // If schema manager isn't available, fall back to original data
+        }
+
+        return self::create($data);
     }
 }
