@@ -19,7 +19,7 @@ use App\Http\Controllers\AdminLeadershipController;
 use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminBackupController;
-
+use App\Http\Controllers\AdminsettingsController;
 // Public routes
 Route::post('/login', [AccountController::class, 'login']);
 Route::post('/register', [AccountController::class, 'store']);
@@ -155,6 +155,13 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::put('activity-logs/{activityLog}',    [ActivityLogController::class, 'updateLogs']);
     Route::delete('activity-logs',               [ActivityLogController::class, 'delallLogs']);
     Route::delete('activity-logs/{activityLog}', [ActivityLogController::class, 'destroyLogs']);
+    });
+
+    //general settings for change password?
+    Route::prefix('admin')->group(function(){
+    Route::get('settings',         [AdminsettingsController::class, 'index']);
+    Route::post('settings',        [AdminsettingsController::class, 'store']);
+    Route::post('change-password', [AdminsettingsController::class, 'changePassword']);
     });
 
 });
