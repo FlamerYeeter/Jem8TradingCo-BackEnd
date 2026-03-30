@@ -123,11 +123,15 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     // Route::delete('/cart/product/{product}', [CartController::class, 'destroyByProduct']);
     // Route::post('/cart/clear', [CartController::class, 'clear']);
      // Backup Recovery
-    Route::post('/admin/backups/run',              [AdminBackupController::class, 'adminRunBackup']);
-    Route::post('/admin/backups/restore',          [AdminBackupController::class, 'adminUploadRestore']);
-    Route::get('/admin/backups',                   [AdminBackupController::class, 'adminHistoryBackup']);
-    Route::get('/admin/backups/{id}/download',     [AdminBackupController::class, 'adminDownloadBackup']);
-    Route::delete('/admin/backups/{id}',           [AdminBackupController::class, 'adminDeleteBackup']);
+
+        
+        Route::get('/admin/backups',              [AdminBackupController::class, 'adminHistoryBackup']);
+        Route::post('/admin/backups/run',         [AdminBackupController::class, 'adminRunBackup']);
+        Route::get('/admin/backups/{id}/download',[AdminBackupController::class, 'adminDownloadBackup']);
+        Route::delete('/admin/backups/{id}',      [AdminBackupController::class, 'adminDeleteBackup']);
+        Route::post('/admin/backups/restore',     [AdminBackupController::class, 'adminUploadRestore']);
+    
+    
 
     // Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);

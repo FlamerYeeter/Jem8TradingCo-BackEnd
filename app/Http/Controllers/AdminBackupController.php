@@ -40,13 +40,19 @@ class AdminBackupController extends Controller
                 $this->exportFull($fullPath);
             }
 
+            // After the export call, before create():
+            if (!file_exists($fullPath) || filesize($fullPath) === 0) {
+                throw new \Exception('Backup file was not created. Check mysqldump path and DB credentials.');
+            }
+
             $backup = admin_backup::create([
                 'backup_type' => $request->backup_type,
-                'backup_size' => file_exists($fullPath) ? filesize($fullPath) : 0,
-                'status'      => file_exists($fullPath) ? 'completed' : 'failed',
+                'backup_size' => filesize($fullPath),
+                'status'      => 'completed',
                 'file_name'   => $fileName,
                 'backup_path' => $backupPath,
             ]);
+            
 
             // ✅ Log: backup created
             ActivityLog::log(Auth::user(), 'Created a backup', 'backups', [
@@ -179,14 +185,48 @@ class AdminBackupController extends Controller
     }
 
     // ✅ Private helpers (unchanged)
-    private function exportDatabase($fullPath)
+        private function exportDatabase($fullPath)
     {
         $db        = config('database.connections.mysql.database');
         $user      = config('database.connections.mysql.username');
         $password  = config('database.connections.mysql.password');
         $host      = config('database.connections.mysql.host');
-        $mysqldump = 'C:\\xampp\\mysql\\bin\\mysqldump';
-        exec("{$mysqldump} --user={$user} --password={$password} --host={$host} {$db} -r \"{$fullPath}\"");
+
+        // Try common paths; falls back to just 'mysqldump' if on PATH
+        $mysqldump = $this->findMysqldump();
+
+        $command = sprintf(
+            '"%s" --user=%s --password=%s --host=%s %s -r "%s" 2>&1',
+            $mysqldump,
+            escapeshellarg($user),
+            escapeshellarg($password),
+            escapeshellarg($host),
+            escapeshellarg($db),
+            $fullPath
+        );
+
+        exec($command, $output, $returnCode);
+
+        if ($returnCode !== 0) {
+            throw new \Exception('mysqldump failed: ' . implode("\n", $output));
+        }
+    }
+
+        private function findMysqldump(): string
+    {
+        $candidates = [
+            'C:\\xampp\\mysql\\bin\\mysqldump.exe',
+            'C:\\wamp64\\bin\\mysql\\mysql8.0.31\\bin\\mysqldump.exe',
+            '/usr/bin/mysqldump',
+            '/usr/local/bin/mysqldump',
+            'mysqldump', // fallback: rely on system PATH
+        ];
+
+        foreach ($candidates as $path) {
+            if (file_exists($path)) return $path;
+        }
+
+        return 'mysqldump'; // last resort
     }
 
     private function exportFiles($fullPath)
