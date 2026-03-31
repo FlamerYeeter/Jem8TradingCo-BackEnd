@@ -30,6 +30,8 @@ Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 Route::get('/products/{id}', [ShopController::class, 'showProduct']);
 
 // Reviews (public)
+Route::get('/reviews/latest', [ReviewController::class, 'getLatestReviews']);
+Route::get('/reviews/{review}', [ReviewController::class, 'show']);
 Route::get('/reviews', [ReviewController::class, 'all']);
 Route::get('/reviews/{review}', [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
@@ -124,14 +126,14 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     // Route::post('/cart/clear', [CartController::class, 'clear']);
      // Backup Recovery
 
-        
+
         Route::get('/admin/backups',              [AdminBackupController::class, 'adminHistoryBackup']);
         Route::post('/admin/backups/run',         [AdminBackupController::class, 'adminRunBackup']);
         Route::get('/admin/backups/{id}/download',[AdminBackupController::class, 'adminDownloadBackup']);
         Route::delete('/admin/backups/{id}',      [AdminBackupController::class, 'adminDeleteBackup']);
         Route::post('/admin/backups/restore',     [AdminBackupController::class, 'adminUploadRestore']);
-    
-    
+
+
 
     // Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);
