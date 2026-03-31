@@ -10,6 +10,43 @@ use Illuminate\Support\Facades\Auth;
 
 class ReviewController extends Controller
 {
+    // ✅ GET - Latest 3 approved reviews for homepage
+    public function getLatestReviews()
+    {
+        try {
+            $reviews = Review::with('user')
+                ->where('status', 'approved')
+                ->orderBy('created_at', 'desc')
+                ->limit(3)
+                ->get()
+                ->map(function($review) {
+                    return [
+                        'review_id' => $review->id,
+                        'rating' => $review->rating,
+                        'review_text' => $review->review_text,
+                        'status' => $review->status,
+                        'created_at' => $review->created_at,
+                        'user' => $review->user ? [
+                            'first_name' => $review->user->first_name,
+                            'last_name' => $review->user->last_name,
+                            'email' => $review->user->email,
+                        ] : null,
+                    ];
+                });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $reviews
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     // ✅ GET - Reviews for a specific product (public)
     public function index($productId)
     {
@@ -113,15 +150,17 @@ class ReviewController extends Controller
         try {
             $review = Review::findOrFail($id);
 
-            $request->validate([
-                'rating'      => 'sometimes|integer|min:1|max:5',
-                'review_text' => 'nullable|string|max:2000',
-            ]);
+$request->validate([
+    'rating'      => 'sometimes|integer|min:1|max:5',
+    'review_text' => 'nullable|string|max:2000',
+    'status'      => 'sometimes|in:pending,approved,rejected',  // ← add this
+]);
 
-            $review->update([
-                'rating'      => $request->rating ?? $review->rating,
-                'review_text' => $request->review_text ?? $review->review_text,
-            ]);
+$review->update([
+    'rating'      => $request->rating      ?? $review->rating,
+    'review_text' => $request->review_text ?? $review->review_text,
+    'status'      => $request->status      ?? $review->status,  // ← add this
+]);
 
             // Log update
             $user = $request->user() ?? Auth::user();
