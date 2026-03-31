@@ -6,5 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class adminsettings extends Model
 {
-    protected $fillable = ['key', 'value'];
+    protected $fillable = [
+        'key', 
+        'value'
+        ];
 }
