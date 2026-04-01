@@ -97,6 +97,7 @@ class AccountController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Login successful',
+            'token'   => $token,
         ])->withCookie($cookie);
     }
 
@@ -247,6 +248,7 @@ class AccountController extends Controller
             'status' => 'success',
             'data'   => [
                 'id'                => $user->id,
+                'google_id'         => $user->google_id ?? null,
                 'first_name'        => $user->first_name,
                 'last_name'         => $user->last_name,
                 'phone_number'      => $user->phone_number,
@@ -255,7 +257,11 @@ class AccountController extends Controller
                 'business_type'     => $user->business_type ?? null,
                 'email'             => $user->email,
                 'role'              => $user->role,
-                'profile_image'     => $user->profile_image ? asset('storage/' . $user->profile_image) : null,
+                'profile_image'     => $user->profile_image
+                    ? (str_starts_with($user->profile_image, 'http')
+                        ? $user->profile_image
+                        : asset('storage/' . $user->profile_image))
+                    : null,
                 'email_verified_at' => $user->email_verified_at,
                 'created_at'        => $user->created_at,
             ]
@@ -295,7 +301,7 @@ class AccountController extends Controller
 
         $user = $request->user();
 
-        if ($user->profile_image) {
+        if ($user->profile_image && !str_starts_with($user->profile_image, 'http')) {
             Storage::disk('public')->delete($user->profile_image);
         }
 

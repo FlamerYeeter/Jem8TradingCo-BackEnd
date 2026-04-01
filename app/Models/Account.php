@@ -51,12 +51,14 @@ class Account extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
+        'google_id',
+        'google_avatar',
         'first_name',
         'last_name',
         'phone_number',
         'email',
         'password',
-        'role',                          // ← ADDED: allows role to be mass-assigned
+        'role',
         'company_name',
         'position',
         'business_type',

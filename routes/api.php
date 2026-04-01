@@ -20,6 +20,7 @@ use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminBackupController;
 use App\Http\Controllers\AdminsettingsController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 // Public routes
 Route::post('/login', [AccountController::class, 'login']);
 Route::post('/register', [AccountController::class, 'store']);
@@ -124,14 +125,14 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     // Route::post('/cart/clear', [CartController::class, 'clear']);
      // Backup Recovery
 
-        
+
         Route::get('/admin/backups',              [AdminBackupController::class, 'adminHistoryBackup']);
         Route::post('/admin/backups/run',         [AdminBackupController::class, 'adminRunBackup']);
         Route::get('/admin/backups/{id}/download',[AdminBackupController::class, 'adminDownloadBackup']);
         Route::delete('/admin/backups/{id}',      [AdminBackupController::class, 'adminDeleteBackup']);
         Route::post('/admin/backups/restore',     [AdminBackupController::class, 'adminUploadRestore']);
-    
-    
+
+
 
     // Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);
@@ -184,5 +185,7 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
 
     Route::put('/accounts/{id}', [AccountController::class, 'update']);
 
-
 });
+
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
