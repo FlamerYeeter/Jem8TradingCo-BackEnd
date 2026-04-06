@@ -39,7 +39,8 @@ class ChatController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'chatroom_id' => 'required|integer',
+            // allow omitting chatroom_id; we'll default to admin chatroom below
+            'chatroom_id' => 'nullable|integer',
             'messages' => 'required|string',
             'status' => 'nullable|integer',
             'sender' => 'nullable|string',
@@ -50,7 +51,17 @@ class ChatController extends Controller
         // Enforce the authenticated user as the message author to prevent spoofing.
         $data['user_id'] = Auth::id();
 
-        // If no sender provided, default will be applied by DB migration ('user').
+        // If no chatroom provided, ensure the current user has a chatroom and use it.
+        if (empty($data['chatroom_id'])) {
+            $userId = Auth::id();
+            $userChat = LiveChat::firstOrCreate(
+                ['user_id' => $userId],
+                ['status' => 'active']
+            );
+            $data['chatroom_id'] = $userChat->chatroom_id;
+        }
+
+        // Create message (sender/defaults handled by model/migration)
         $message = Message::create($data);
 
         event(new NewMessage($message));
