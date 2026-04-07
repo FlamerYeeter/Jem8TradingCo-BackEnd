@@ -11,15 +11,19 @@ class Product extends Model
     protected $primaryKey = 'product_id';
     protected $table = 'products';
 
-    protected $fillable = [
-        'product_name',
-        'category_id',
-        'product_stocks',
-        'description',
-        'price',
-        'isSale',
-        'reviews_id',
-    ];
+protected $fillable = [
+    'product_name',
+    'category_id',
+    'product_stocks',
+    'description',
+    'price',
+    'isSale',
+    'reviews_id',
+    'acquired_price',  // also missing
+    'unit',
+    'size',
+    'color',
+];
 
     protected $casts = [
         'isSale' => 'boolean',

@@ -14,7 +14,7 @@ class AdminProductController extends Controller
     public function addProduct(Request $request)
     {
         try {
-            // Validate request
+            // Validate request - ADDED missing fields
             $request->validate([
                 'product_name'   => 'required|string',
                 'category_id'    => 'required|integer|exists:categories,category_id',
@@ -22,6 +22,10 @@ class AdminProductController extends Controller
                 'description'    => 'nullable|string',
                 'price'          => 'required|numeric',
                 'isSale'         => 'boolean',
+                'acquired_price' => 'nullable|numeric|min:0',  // ADDED
+                'unit'           => 'nullable|string|max:255',  // ADDED
+                'size'           => 'nullable|string|max:255',  // ADDED
+                'color'          => 'nullable|string|max:255',  // ADDED
                 'images'         => 'sometimes|array',
                 'images.*'       => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
             ]);
@@ -34,7 +38,7 @@ class AdminProductController extends Controller
                 'file_count' => $request->hasFile('images') ? count($request->file('images')) : 0
             ]);
 
-            // Create product
+            // Create product - ADDED missing fields
             $product = Product::create([
                 'product_name'   => $request->product_name,
                 'category_id'    => $request->category_id,
@@ -42,9 +46,14 @@ class AdminProductController extends Controller
                 'description'    => $request->description,
                 'price'          => $request->price,
                 'isSale'         => $request->isSale ?? false,
+                'acquired_price' => $request->acquired_price ?? 0,  // ADDED
+                'unit'           => $request->unit ?? null,         // ADDED
+                'size'           => $request->size ?? null,         // ADDED
+                'color'          => $request->color ?? null,        // ADDED
             ]);
 
             Log::info('Product created with ID: ' . $product->product_id);
+            Log::info('Product color saved: ' . ($product->color ?? 'null')); // Debug
 
             // Handle image upload
             if ($request->hasFile('images')) {
@@ -118,7 +127,8 @@ class AdminProductController extends Controller
                 'debug' => [
                     'images_uploaded' => $product->images->count(),
                     'has_files' => $request->hasFile('images'),
-                    'file_count' => $request->hasFile('images') ? count($request->file('images')) : 0
+                    'file_count' => $request->hasFile('images') ? count($request->file('images')) : 0,
+                    'color_saved' => $product->color  // Debug info
                 ]
             ], 201);
 
@@ -227,6 +237,10 @@ class AdminProductController extends Controller
                 'description'    => 'nullable|string',
                 'price'          => 'sometimes|required|numeric',
                 'isSale'         => 'boolean',
+                'acquired_price' => 'nullable|numeric|min:0',  // ADDED
+                'unit'           => 'nullable|string|max:255',  // ADDED
+                'size'           => 'nullable|string|max:255',  // ADDED
+                'color'          => 'nullable|string|max:255',  // ADDED
                 'images'         => 'sometimes|array',
                 'images.*'       => 'image|mimes:jpeg,png,jpg,gif|max:5120',
                 'remove_images'  => 'sometimes|array',
@@ -243,15 +257,22 @@ class AdminProductController extends Controller
                 ], 404);
             }
 
-            // Update product details
+            // Update product details - ADDED missing fields
             $product->update($request->only([
                 'product_name',
                 'category_id',
                 'product_stocks',
                 'description',
                 'price',
-                'isSale'
+                'isSale',
+                'acquired_price',  // ADDED
+                'unit',            // ADDED
+                'size',            // ADDED
+                'color'            // ADDED
             ]));
+
+            Log::info('Product updated - ID: ' . $product->product_id);
+            Log::info('Updated color: ' . ($product->color ?? 'null'));
 
             // Remove specified images
             if ($request->has('remove_images')) {
