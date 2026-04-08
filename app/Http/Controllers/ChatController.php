@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\NewMessage;
+use App\Http\Resources\ChatRoomResource;
 use App\Models\Message;
 use App\Models\LiveChat;
 use Illuminate\Http\Request;
@@ -27,6 +28,19 @@ class ChatController extends Controller
             ->get()
             ->map(function ($m) {
                 $m->is_me = optional(auth())->id() && $m->user_id == auth()->id();
+
+                // compute avatarUrl for message sender (mirrors ChatRoomResource behavior)
+                $avatarPath = optional($m->user)->profile_image;
+                $avatarUrl = null;
+                if ($avatarPath) {
+                    if (str_starts_with($avatarPath, 'http')) {
+                        $avatarUrl = $avatarPath;
+                    } else {
+                        $avatarUrl = asset('storage/' . ltrim($avatarPath, '/'));
+                    }
+                }
+                $m->avatarUrl = $avatarUrl ?? asset('images/default-avatar.svg');
+
                 return $m;
             });
 
@@ -41,6 +55,7 @@ class ChatController extends Controller
         $data = $request->validate([
             // allow omitting chatroom_id; we'll default to admin chatroom below
             'chatroom_id' => 'nullable|integer',
+            'target_user_id' => 'nullable|integer',
             'messages' => 'required|string',
             'status' => 'nullable|integer',
             'sender' => 'nullable|string',
@@ -51,14 +66,25 @@ class ChatController extends Controller
         // Enforce the authenticated user as the message author to prevent spoofing.
         $data['user_id'] = Auth::id();
 
-        // If no chatroom provided, ensure the current user has a chatroom and use it.
+        // If no chatroom provided, decide which user's chatroom to use.
+        // - For admin (user id 1) allow sending to a specific member via `target_user_id`.
+        // - For regular users, create/return their personal chatroom.
         if (empty($data['chatroom_id'])) {
-            $userId = Auth::id();
-            $userChat = LiveChat::firstOrCreate(
-                ['user_id' => $userId],
-                ['status' => 'active']
-            );
-            $data['chatroom_id'] = $userChat->chatroom_id;
+            if (Auth::id() === 1 && ! empty($data['target_user_id'])) {
+                $targetUserId = (int) $data['target_user_id'];
+                $userChat = LiveChat::firstOrCreate(
+                    ['user_id' => $targetUserId],
+                    ['status' => 'active']
+                );
+                $data['chatroom_id'] = $userChat->chatroom_id;
+            } else {
+                $userId = Auth::id();
+                $userChat = LiveChat::firstOrCreate(
+                    ['user_id' => $userId],
+                    ['status' => 'active']
+                );
+                $data['chatroom_id'] = $userChat->chatroom_id;
+            }
         }
 
         // Create message (sender/defaults handled by model/migration)
@@ -89,6 +115,19 @@ class ChatController extends Controller
         $messages = $messages->load('user:id,first_name,last_name,profile_image')
             ->map(function ($m) {
                 $m->is_me = optional(auth())->id() && $m->user_id == auth()->id();
+
+                // compute avatarUrl for message sender (mirrors ChatRoomResource behavior)
+                $avatarPath = optional($m->user)->profile_image;
+                $avatarUrl = null;
+                if ($avatarPath) {
+                    if (str_starts_with($avatarPath, 'http')) {
+                        $avatarUrl = $avatarPath;
+                    } else {
+                        $avatarUrl = asset('storage/' . ltrim($avatarPath, '/'));
+                    }
+                }
+                $m->avatarUrl = $avatarUrl ?? asset('images/default-avatar.svg');
+
                 return $m;
             });
 
@@ -100,12 +139,19 @@ class ChatController extends Controller
      */
     public function rooms()
     {
-        $rooms = LiveChat::withCount('messages')
-            ->where('user_id', Auth::id())
-            ->orderBy('chatroom_id', 'asc')
-            ->get();
+        // Eager-load user and the latest message for a clean front-end payload.
+        $query = LiveChat::with(['user:id,first_name,last_name,email,profile_image', 'product:product_id,product_name', 'messages' => function ($q) {
+            $q->orderBy('created_at', 'desc')->limit(1);
+        }])->withCount('messages')
+        ->orderBy('chatroom_id', 'asc');
 
-        return response()->json($rooms);
+        if (Auth::id() !== 1) {
+            $query = $query->where('user_id', Auth::id());
+        }
+
+        $rooms = $query->get();
+
+        return response()->json(ChatRoomResource::collection($rooms));
     }
 
     /**
@@ -113,28 +159,18 @@ class ChatController extends Controller
      */
     public function roomsSummary()
     {
-        $rooms = LiveChat::with(['user:id,first_name,last_name,profile_image', 'messages' => function ($q) {
+        // Provide the same enriched payload as `rooms` but ordered for summaries.
+        $query = LiveChat::with(['user:id,first_name,last_name,email,profile_image', 'product:product_id,product_name', 'messages' => function ($q) {
             $q->orderBy('created_at', 'desc')->limit(1);
-            }])
-            ->where('user_id', Auth::id())
-            ->withCount('messages')
-            ->orderBy('chatroom_id', 'desc')
-            ->get()
-            ->map(function ($room) {
-                $last = $room->messages->first();
-                return [
-                    'chatroom_id' => $room->chatroom_id,
-                    'account' => $room->user,
-                    'last_message' => $last ? [
-                        'message_id' => $last->message_id,
-                        'messages' => $last->messages,
-                        'created_at' => $last->created_at,
-                    ] : null,
-                    'messages_count' => $room->messages_count,
-                    'status' => $room->status,
-                ];
-            });
+            }])->withCount('messages')
+            ->orderBy('chatroom_id', 'desc');
 
-        return response()->json($rooms);
+        if (Auth::id() !== 1) {
+            $query = $query->where('user_id', Auth::id());
+        }
+
+        $rooms = $query->get();
+
+        return response()->json(ChatRoomResource::collection($rooms));
     }
 }

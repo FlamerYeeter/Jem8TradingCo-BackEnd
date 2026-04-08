@@ -40,6 +40,18 @@ class NewMessage implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
+        $user = $this->message->user;
+
+        $avatarPath = optional($user)->profile_image;
+        $avatarUrl = null;
+        if ($avatarPath) {
+            if (str_starts_with($avatarPath, 'http')) {
+                $avatarUrl = $avatarPath;
+            } else {
+                $avatarUrl = asset('storage/' . ltrim($avatarPath, '/'));
+            }
+        }
+
         return [
             'message' => [
                 'id' => $this->message->message_id,
@@ -49,6 +61,12 @@ class NewMessage implements ShouldBroadcast
                 'status' => $this->message->status,
                 'cart_id' => $this->message->cart_id,
                 'created_at' => optional($this->message->created_at)->toDateTimeString(),
+                'avatarUrl' => $avatarUrl ?? asset('images/default-avatar.svg'),
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                ] : null,
             ],
         ];
     }

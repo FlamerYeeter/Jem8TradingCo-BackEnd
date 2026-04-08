@@ -36,6 +36,14 @@ class LiveChat extends Model
     }
 
     /**
+     * Get the product associated with this chat (optional).
+     */
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id', 'product_id');
+    }
+
+    /**
      * Get all messages in this live chat room.
      */
     public function messages()
