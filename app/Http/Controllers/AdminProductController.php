@@ -18,7 +18,6 @@ class AdminProductController extends Controller
             $request->validate([
                 'product_name'   => 'required|string',
                 'category_id'    => 'required|integer|exists:categories,category_id',
-                'product_stocks' => 'required|integer|min:0',
                 'description'    => 'nullable|string',
                 'price'          => 'required|numeric',
                 'isSale'         => 'boolean',
@@ -42,7 +41,6 @@ class AdminProductController extends Controller
             $product = Product::create([
                 'product_name'   => $request->product_name,
                 'category_id'    => $request->category_id,
-                'product_stocks' => $request->product_stocks,
                 'description'    => $request->description,
                 'price'          => $request->price,
                 'isSale'         => $request->isSale ?? false,
@@ -233,7 +231,6 @@ class AdminProductController extends Controller
             $request->validate([
                 'product_name'   => 'sometimes|required|string',
                 'category_id'    => 'sometimes|required|integer|exists:categories,category_id',
-                'product_stocks' => 'sometimes|required|integer|min:0',
                 'description'    => 'nullable|string',
                 'price'          => 'sometimes|required|numeric',
                 'isSale'         => 'boolean',
@@ -261,7 +258,6 @@ class AdminProductController extends Controller
             $product->update($request->only([
                 'product_name',
                 'category_id',
-                'product_stocks',
                 'description',
                 'price',
                 'isSale',
