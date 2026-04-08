@@ -16,7 +16,6 @@ return new class extends Migration
             $table->id('product_id'); // BIGINT UNSIGNED PK
             $table->string('product_name');
             $table->unsignedBigInteger('category_id'); // BIGINT UNSIGNED FK
-            $table->integer('product_stocks')->default(0);
             $table->text('description')->nullable();
             $table->decimal('price', 10, 2);
             $table->boolean('isSale')->default(false);
