@@ -168,7 +168,7 @@ class BlogController extends Controller
                     ]);
                 }
             }
-
+    
             ActivityLog::log(Auth::user(), 'Updated a blog post', 'blogs', [
                 'description'     => Auth::user()->first_name . ' updated blog: ' . $blog->blog_title,
                 'reference_table' => 'blogs',
