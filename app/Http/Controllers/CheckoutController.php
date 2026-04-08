@@ -97,7 +97,8 @@ class CheckoutController extends Controller
     $inStockItems = [];
 
     foreach ($cartItems as $item) {
-        $price = (float) ($item->product->price ?? 0);
+    if (!$item->product) continue;
+    $price = (float) ($item->product->price ?? 0);
         $grandTotal += $price * (int) $item->quantity;
 
 
@@ -117,16 +118,7 @@ class CheckoutController extends Controller
             ];
         }
 
-        // For in-stock items only, check inventory
-        if ($productStatus === 'in_stock') {
-            if (isset($item->product->product_stocks) && $item->product->product_stocks < $item->quantity) {
-                return response()->json([
-                    'message' => 'Insufficient stock for: ' . $item->product->product_name,
-                    'product_id' => $item->product_id,
-                    'available_stock' => $item->product->product_stocks
-                ], 400);
-            }
-        }
+
     }
 
     $paidAmount = $grandTotal + $shippingFee;
@@ -142,13 +134,14 @@ class CheckoutController extends Controller
 
         $checkout = Checkout::create([
             'user_id'              => $user->id,
+            'cart_id'              => $cartItems->first()->cart_id,
             'discount_id'          => null,
             'payment_method'       => $method,
-            'payment_details'      => $paymentDetailsWithStatus,
+            'payment_details'      => json_encode($paymentDetailsWithStatus),
             'shipping_fee'         => $shippingFee,
             'paid_amount'          => $paidAmount,
             'paid_at'              => $paidAt,
-            'special_instructions' => $request->input('special_instructions'),
+            'special_instructions' => $request->input('special_instructions', null),
         ]);
 
         $paymentReference = json_encode($paymentDetailsWithStatus);
@@ -174,32 +167,20 @@ class CheckoutController extends Controller
             'notes'       => $request->input('special_instructions', null),
         ]);
 
-        if (in_array($method, ['gcash', 'maya', 'cod'])) {
-            foreach ($cartItems as $item) {
-                $productStatus = $item->product->status ?? 'in_stock';
-
-                // Only deduct stock for in-stock products
-                if ($productStatus === 'in_stock') {
-                    $product = Product::find($item->product_id);
-                    if ($product && isset($product->product_stocks)) {
-                        $product->product_stocks = max(0, $product->product_stocks - $item->quantity);
-                        $product->save();
-
-                        Log::info('Stock deducted for product', [
-                            'product_id' => $item->product_id,
-                            'quantity' => $item->quantity,
-                            'remaining_stock' => $product->product_stocks
-                        ]);
-                    }
-                } else {
-                    Log::info('Pre-order item - stock not deducted', [
-                        'product_id' => $item->product_id,
-                        'product_name' => $item->product->product_name,
-                        'quantity' => $item->quantity
-                    ]);
-                }
+        if (in_array($method, ['gcash', 'maya', 'cod', 'bank_transfer', 'check'])) {
+    foreach ($cartItems as $item) {
+    if (!$item->product) continue;
+    $productStatus = $item->product->status ?? 'in_stock';
+    if ($productStatus === 'in_stock') {
+            $product = Product::find($item->product_id);
+            if ($product && isset($product->product_stocks)) {
+                $product->product_stocks = max(0, $product->product_stocks - $item->quantity);
+                $product->save();
             }
         }
+
+    }
+}
 
        Cart::whereIn('cart_id', $cartItems->pluck('cart_id'))
     ->update(['is_checkout' => true]);
@@ -240,9 +221,13 @@ class CheckoutController extends Controller
         ], 201);
 
     } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Checkout failed', ['message' => $e->getMessage(), 'user_id' => $user->id]);
-        return response()->json(['message' => 'Checkout failed', 'error' => $e->getMessage()], 500);
-    }
+    DB::rollBack();
+    Log::error('Checkout failed', ['message' => $e->getMessage(), 'user_id' => $user->id]);
+    return response()->json([
+        'message' => 'Checkout failed',
+        'error' => $e->getMessage(),
+        'trace' => $e->getLine()
+    ], 500);
+}
 }
 }
