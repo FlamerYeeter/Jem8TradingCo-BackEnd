@@ -10,6 +10,9 @@ use Exception;
 
 class ActivityLogController extends Controller
 {
+    // Timezone used for all display / grouping
+    private const TZ = 'Asia/Manila';
+
     // ── Read ──────────────────────────────────────────────────────────────────
 
     public function logFetch(Request $request)
@@ -36,7 +39,9 @@ class ActivityLogController extends Controller
                 $query->search($request->search);
             }
 
-            // Date range (treated as Asia/Manila dates)
+            // ── Date range filter ─────────────────────────────────────────────
+            // logged_at stores Manila-local DATETIME. whereDate() compares only
+            // the date part, so this is safe without timezone conversion.
             if ($request->filled('date_from')) {
                 $query->whereDate('logged_at', '>=', $request->date_from);
             }
@@ -46,9 +51,11 @@ class ActivityLogController extends Controller
 
             $logs = $query->paginate(20);
 
-            // Group by Manila-localized date label
+            // ── Group by Manila date label ─────────────────────────────────────
+            // We use the model accessor (getLoggedAtManilaAttribute) to get a
+            // correctly-labelled Manila Carbon for grouping and display.
             $groupedLogs = $logs->getCollection()
-                ->groupBy(fn($log) => $this->manilaDate($log->logged_at)->format('l, F j, Y'))
+                ->groupBy(fn($log) => $log->logged_at_manila->format('l, F j, Y'))
                 ->map(fn($items) => $items->map(fn($log) => $this->formatLog($log))->values());
 
             return response()->json([
@@ -191,19 +198,16 @@ class ActivityLogController extends Controller
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Convert a UTC Carbon datetime to Asia/Manila.
-     */
-    private function manilaDate($datetime): Carbon
-    {
-        return Carbon::parse($datetime)->setTimezone('Asia/Manila');
-    }
-
-    /**
      * Serialize a single ActivityLog into the shape the frontend expects.
+     *
+     * Uses the model's getLoggedAtManilaAttribute accessor to get a reliably
+     * Manila-time Carbon regardless of how the DB driver parses DATETIME values.
      */
     private function formatLog(ActivityLog $log): array
     {
-        $manila = $this->manilaDate($log->logged_at);
+        // Use the model accessor — this handles both UTC-stored and local-stored
+        // DATETIME columns correctly via shiftTimezone().
+        $manila = $log->logged_at_manila;
 
         return [
             'id'                  => $log->activity_id,
@@ -218,10 +222,16 @@ class ActivityLogController extends Controller
             'mode_of_payment'     => $log->mode_of_payment,
             'reference_table'     => $log->reference_table,
             'reference_id'        => $log->reference_id,
-            // Human-readable, Manila-localised timestamps
-            'logged_at'           => $manila->format('M d \a\t g:i A'),
-            'logged_at_time'      => $manila->format('g:i A'),
-            'logged_at_iso'       => $manila->toIso8601String(),
+
+            // ── Timestamps — all Manila-local ──────────────────────────────
+            // "Jul 15 at 2:30 PM"
+            'logged_at'      => $manila->format('M d \a\t g:i A'),
+            // "2:30 PM"
+            'logged_at_time' => $manila->format('g:i A'),
+            // Full ISO 8601 with +08:00 offset — useful for frontend date math
+            'logged_at_iso'  => $manila->toIso8601String(),
+            // Raw date string (YYYY-MM-DD) for grouping fallback
+            'logged_at_date' => $manila->format('Y-m-d'),
         ];
     }
 

@@ -11,9 +11,18 @@ class ActivityLog extends Model
 {
     use HasFactory;
 
+    // ── Table / Key ───────────────────────────────────────────────────────────
+
     protected $table = 'activity_logs';
 
     protected $primaryKey = 'activity_id';
+
+    // ── Timezone used everywhere in this model ────────────────────────────────
+    // Both Asia/Manila (UTC+8) and Asia/Taipei (UTC+8) share the same offset.
+    // We normalise to Asia/Manila throughout.
+    private const TZ = 'Asia/Manila';
+
+    // ── Fillable ──────────────────────────────────────────────────────────────
 
     protected $fillable = [
         'user_id',
@@ -33,10 +42,14 @@ class ActivityLog extends Model
 
     protected $casts = [
         'amount'     => 'decimal:2',
-        'logged_at'  => 'datetime',
+        'logged_at'  => 'datetime',     // Eloquent keeps this as a Carbon instance
         'created_at' => 'datetime',
         'meta'       => 'array',
     ];
+
+    // ── Date columns Eloquent should treat as Carbon instances ────────────────
+    // (Redundant with $casts but explicit is safer across Laravel versions)
+    protected $dates = ['logged_at', 'created_at', 'updated_at'];
 
     // ── Relationships ─────────────────────────────────────────────────────────
 
@@ -76,15 +89,18 @@ class ActivityLog extends Model
             $name = $user->email ?? 'Unknown';
         }
 
-        // Always stamp logged_at in Asia/Manila timezone
-        $now = Carbon::now('Asia/Manila');
+        // ── Always stamp logged_at in Asia/Manila (UTC+8) ────────────────────
+        // We store the Manila-local time directly as a DATETIME column (no UTC
+        // conversion) so that date-range filters using whereDate() work correctly
+        // without any further conversion.
+        $now = Carbon::now(self::TZ);
 
         $data = array_merge([
             'user_id'   => $user->id,
             'user_name' => $name,
             'action'    => $action,
             'category'  => $category,
-            'logged_at' => $now,
+            'logged_at' => $now->toDateTimeString(), // "2025-07-15 14:30:00"
         ], $extra);
 
         // Auto-generate a human-readable description if one was not supplied
@@ -103,6 +119,28 @@ class ActivityLog extends Model
         return self::create($data);
     }
 
+    // ── Timezone Accessor ─────────────────────────────────────────────────────
+
+    /**
+     * Return logged_at as a Carbon instance already set to Asia/Manila.
+     *
+     * Because we store the Manila-local datetime directly (not UTC), we use
+     * ->shiftTimezone() which changes the TZ label without shifting the clock value.
+     * This ensures that all callers get a correctly-labelled Manila Carbon.
+     */
+    public function getLoggedAtManilaAttribute(): Carbon
+    {
+        $raw = $this->logged_at; // Carbon (Eloquent parsed it)
+
+        if ($raw === null) {
+            return Carbon::now(self::TZ);
+        }
+
+        // shiftTimezone() keeps the same H:i:s but tells Carbon it is Manila time.
+        // Use this (not setTimezone) when the DB stores local time as DATETIME.
+        return $raw->shiftTimezone(self::TZ);
+    }
+
     // ── Auto-purge Helpers ────────────────────────────────────────────────────
 
     /**
@@ -111,9 +149,9 @@ class ActivityLog extends Model
      */
     public static function purgeOld(int $days = 3): int
     {
-        $cutoff = Carbon::now('Asia/Manila')->subDays($days);
+        $cutoff = Carbon::now(self::TZ)->subDays($days);
 
-        return self::where('logged_at', '<', $cutoff)->delete();
+        return self::where('logged_at', '<', $cutoff->toDateTimeString())->delete();
     }
 
     // ── Description Builder ───────────────────────────────────────────────────
@@ -127,7 +165,7 @@ class ActivityLog extends Model
         string $category,
         array  $data
     ): string {
-        $product = $data['product_name']     ?? null;
+        $product = $data['product_name']        ?? null;
         $code    = $data['product_unique_code'] ?? null;
         $amount  = isset($data['amount']) && $data['amount'] !== null
             ? '₱' . number_format((float) $data['amount'], 2)
@@ -137,32 +175,24 @@ class ActivityLog extends Model
             ? strtoupper($data['reference_table']) . ' #' . $data['reference_id']
             : null;
 
-        // Build contextual parts
         $productPart  = $product ? " '{$product}'" : ($code ? " [{$code}]" : '');
-        $amountPart   = $amount  ? " for {$amount}"    : '';
-        $paymentPart  = $payment ? " via {$payment}"   : '';
-        $refPart      = $ref     ? " (ref: {$ref})"    : '';
+        $amountPart   = $amount  ? " for {$amount}"   : '';
+        $paymentPart  = $payment ? " via {$payment}"  : '';
+        $refPart      = $ref     ? " (ref: {$ref})"   : '';
 
-        // Category-aware templates
         switch ($category) {
             case 'orders':
                 return "{$userName} {$action}{$productPart}{$amountPart}{$paymentPart}{$refPart}.";
-
             case 'payments':
                 return "{$userName} {$action}{$amountPart}{$paymentPart}{$productPart}{$refPart}.";
-
             case 'stock':
                 return "{$userName} {$action}{$productPart}{$refPart}.";
-
             case 'account':
                 return "{$userName} {$action} their account{$refPart}.";
-
             case 'blogs':
                 return "{$userName} {$action}{$productPart}{$refPart}.";
-
             case 'backups':
                 return "{$userName} {$action} a system backup{$refPart}.";
-
             default:
                 return "{$userName} {$action}{$productPart}{$amountPart}{$refPart}.";
         }
