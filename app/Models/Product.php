@@ -14,15 +14,15 @@ class Product extends Model
 protected $fillable = [
     'product_name',
     'category_id',
-    'product_stocks',
     'description',
     'price',
     'isSale',
     'reviews_id',
-    'acquired_price',  // also missing
+    'acquired_price',
     'unit',
     'size',
     'color',
+    'status',
 ];
 
     protected $casts = [

@@ -17,7 +17,7 @@ class ShopController extends Controller
         try{
 
         $user = $request->user();
-    
+
         if (!$user) {
             return response()->json(['message' => 'bruhhh'], 401);
         }
@@ -77,16 +77,15 @@ class ShopController extends Controller
         $request->validate([
             'product_name' => 'required|string',
             'category_id' => 'required|integer',
-            'product_stocks' => 'required|integer',
             'description' => 'required|string',
             'price' => 'required|numeric',
-            
+
             'image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048'
         ]);
 
         $isSale = $request->boolean('isSale');
 
-        
+
         // Store image
         $imagePath = null;
         if ($request->hasFile('image') && $request->file('image')->isValid()) {
@@ -96,7 +95,6 @@ class ShopController extends Controller
         $product = Product::create([
             'product_name' => $request->product_name,
             'category_id' => $request->category_id,
-            'product_stocks' => $request->product_stocks,
             'description' => $request->description,
             'price' => $request->price,
             'isSale' => $isSale,
@@ -134,7 +132,7 @@ class ShopController extends Controller
                 'message' => $e->errors()
             ], 422);
         }
-    }   
+    }
 
     // Show single product details with all images.(kukunin yung id ah)
     public function showProduct($id){
@@ -257,7 +255,7 @@ class ShopController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $query = Cart::with('product')
+        $query = Cart::with(['product', 'product.images'])
             ->where('user_id', $user->id);
 
         // Filter by isCheckout true or false
@@ -284,6 +282,6 @@ class ShopController extends Controller
                 'message' => 'Cart not found'
             ], 404);
         }
-        
+
     }
 }

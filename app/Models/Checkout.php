@@ -14,7 +14,7 @@ class Checkout extends Model
 
     protected $fillable = [
         'user_id',
-        'cart_id',              // single cart
+        'cart_id',              
         'discount_id',
         'payment_method',
         'payment_details',
