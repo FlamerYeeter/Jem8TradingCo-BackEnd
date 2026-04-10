@@ -72,6 +72,7 @@ class DeliveryController extends Controller
                     'paid_amount'          => $checkout->paid_amount,
                     'paid_at'              => $checkout->paid_at,
                     'special_instructions' => $checkout->special_instructions,
+                    'delivery_address'     => $checkout->delivery_address,
                     'created_at'           => $checkout->created_at,
 
                     'cart' => $checkout->cart ? [

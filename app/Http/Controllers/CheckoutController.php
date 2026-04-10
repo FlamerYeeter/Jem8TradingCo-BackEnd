@@ -91,14 +91,14 @@ class CheckoutController extends Controller
     // ── Build delivery address array ──────────────────────────────────────
     $addr = $request->input('delivery_address', []);
 
-    $deliveryAddress = !empty($addr) ? array_filter([
-        'street'   => $addr['street']   ?? null,
-        'barangay' => $addr['barangay'] ?? null,
-        'city'     => $addr['city']     ?? null,
-        'province' => $addr['province'] ?? null,
-        'zip'      => $addr['zip']      ?? null,
-        'country'  => $addr['country']  ?? 'Philippines',
-    ]) : null;
+    $deliveryAddress = !empty($addr) ? [
+    'street'   => $addr['street']   ?? '',
+    'barangay' => $addr['barangay'] ?? '',
+    'city'     => $addr['city']     ?? '',
+    'province' => $addr['province'] ?? '',
+    'zip'      => $addr['zip']      ?? '',
+    'country'  => $addr['country']  ?? 'Philippines',
+] : null;
 
     // ── Payment method validation (unchanged) ─────────────────────────────
     switch ($method) {
