@@ -21,6 +21,8 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminBackupController;
 use App\Http\Controllers\AdminsettingsController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\ProfileController;
 // Public routes
 Route::post('/login', [AccountController::class, 'login']);
 Route::post('/register', [AccountController::class, 'store']);
@@ -136,7 +138,8 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
         Route::post('/admin/backups/restore',     [AdminBackupController::class, 'adminUploadRestore']);
 
 
-
+    //subscribe letter
+    Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe']);
     // Checkout
     Route::post('/checkout', [CheckoutController::class, 'store']);
 
@@ -150,7 +153,12 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::get('/dashboard', [Dashboard::class, 'allDashboard']);
 
     // Chat
+    
 
+
+        // routes/api.php
+    Route::post('/profile/change-password', [ProfileController::class, 'changePassword'])
+    ->middleware('auth:sanctum');
     // Activity Log
     Route::prefix('admin')->group(function(){
     Route::get('activity-logs',                  [ActivityLogController::class, 'logFetch']);
