@@ -255,7 +255,7 @@ class ShopController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $query = Cart::with('product')
+        $query = Cart::with(['product', 'product.images'])
             ->where('user_id', $user->id);
 
         // Filter by isCheckout true or false

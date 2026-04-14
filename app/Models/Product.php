@@ -18,10 +18,11 @@ protected $fillable = [
     'price',
     'isSale',
     'reviews_id',
-    'acquired_price',  // also missing
+    'acquired_price',
     'unit',
     'size',
     'color',
+    'status',
 ];
 
     protected $casts = [

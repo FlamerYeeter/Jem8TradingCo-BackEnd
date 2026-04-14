@@ -27,6 +27,7 @@ class AdminProductController extends Controller
                 'color'          => 'nullable|string|max:255',  // ADDED
                 'images'         => 'sometimes|array',
                 'images.*'       => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+                'status' => 'nullable|string|in:in_stock,pre_order',
             ]);
 
             // Log request info
@@ -42,6 +43,7 @@ class AdminProductController extends Controller
                 'product_name'   => $request->product_name,
                 'category_id'    => $request->category_id,
                 'description'    => $request->description,
+                'status' => $request->status ?? 'in_stock',
                 'price'          => $request->price,
                 'isSale'         => $request->isSale ?? false,
                 'acquired_price' => $request->acquired_price ?? 0,  // ADDED
@@ -232,6 +234,7 @@ class AdminProductController extends Controller
                 'product_name'   => 'sometimes|required|string',
                 'category_id'    => 'sometimes|required|integer|exists:categories,category_id',
                 'description'    => 'nullable|string',
+                'status' => 'nullable|string|in:in_stock,pre_order',
                 'price'          => 'sometimes|required|numeric',
                 'isSale'         => 'boolean',
                 'acquired_price' => 'nullable|numeric|min:0',  // ADDED
@@ -256,16 +259,17 @@ class AdminProductController extends Controller
 
             // Update product details - ADDED missing fields
             $product->update($request->only([
-                'product_name',
-                'category_id',
-                'description',
-                'price',
-                'isSale',
-                'acquired_price',  // ADDED
-                'unit',            // ADDED
-                'size',            // ADDED
-                'color'            // ADDED
-            ]));
+            'product_name',
+            'category_id',
+            'description',
+            'price',
+            'isSale',
+            'acquired_price',
+            'unit',
+            'size',
+            'color',
+            'status'
+        ]));
 
             Log::info('Product updated - ID: ' . $product->product_id);
             Log::info('Updated color: ' . ($product->color ?? 'null'));

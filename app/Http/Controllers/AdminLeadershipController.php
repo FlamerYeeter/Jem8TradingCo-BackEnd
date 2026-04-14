@@ -23,10 +23,10 @@ class AdminLeadershipController extends Controller
             $leaderships = $query->get();
 
             // ✅ Log: viewed leadership list
-            ActivityLog::log(Auth::user(), 'Viewed leadership list', 'account', [
-                'description'     => Auth::user()->first_name . ' viewed the leadership list',
-                'reference_table' => 'admin_leaderships',
-            ]);
+            // ActivityLog::log(Auth::user(), 'Viewed leadership list', 'account', [
+            //     'description'     => Auth::user()->first_name . ' viewed the leadership list',
+            //     'reference_table' => 'admin_leaderships',
+            // ]);
 
             return response()->json([
                 'status' => 'success',
@@ -69,11 +69,11 @@ class AdminLeadershipController extends Controller
             ]);
 
             // ✅ Log: created leadership
-            ActivityLog::log(Auth::user(), 'Added a leadership member', 'account', [
-                'description'     => Auth::user()->first_name . ' added leadership member: ' . $request->name . ' as ' . $request->position,
-                'reference_table' => 'admin_leaderships',
-                'reference_id'    => $leadership->id,
-            ]);
+            // ActivityLog::log(Auth::user(), 'Added a leadership member', 'account', [
+            //     'description'     => Auth::user()->first_name . ' added leadership member: ' . $request->name . ' as ' . $request->position,
+            //     'reference_table' => 'admin_leaderships',
+            //     'reference_id'    => $leadership->id,
+            // ]);
 
             return response()->json([
                 'status'    => 'success',
@@ -118,11 +118,11 @@ class AdminLeadershipController extends Controller
             $leadership->update($data);
 
             // ✅ Log: updated leadership
-            ActivityLog::log(Auth::user(), 'Updated a leadership member', 'account', [
-                'description'     => Auth::user()->first_name . ' updated leadership member: ' . $leadership->name,
-                'reference_table' => 'admin_leaderships',
-                'reference_id'    => $id,
-            ]);
+            // ActivityLog::log(Auth::user(), 'Updated a leadership member', 'account', [
+            //     'description'     => Auth::user()->first_name . ' updated leadership member: ' . $leadership->name,
+            //     'reference_table' => 'admin_leaderships',
+            //     'reference_id'    => $id,
+            // ]);
 
             return response()->json([
                 'status'    => 'success',
@@ -153,11 +153,11 @@ class AdminLeadershipController extends Controller
             $leadership->delete();
 
             // ✅ Log: deleted leadership
-            ActivityLog::log(Auth::user(), 'Deleted a leadership member', 'account', [
-                'description'     => Auth::user()->first_name . ' deleted leadership member: ' . $name,
-                'reference_table' => 'admin_leaderships',
-                'reference_id'    => $id,
-            ]);
+            // ActivityLog::log(Auth::user(), 'Deleted a leadership member', 'account', [
+            //     'description'     => Auth::user()->first_name . ' deleted leadership member: ' . $name,
+            //     'reference_table' => 'admin_leaderships',
+            //     'reference_id'    => $id,
+            // ]);
 
             return response()->json(['status' => 'success', 'message' => 'Leadership entry deleted successfully'], 200);
 

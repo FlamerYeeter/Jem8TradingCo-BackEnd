@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
-use App\Models\Account;       
-use App\Models\Checkout;     
-use App\Models\UserAddress;   
-use App\Models\Contact;            
-use App\Models\Product;      
+use App\Models\Account;
+use App\Models\Checkout;
+use App\Models\UserAddress;
+use App\Models\Contact;
+use App\Models\Product;
 use App\Models\Notifications;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -18,12 +18,12 @@ class Dashboard extends Controller
 {
     // public function index(){
     //     return view ('dashboard',[
-            
+
     //         'total_views' => Account::count(),
     //         'new_users' =>Account::whereMonth('created_at', now()->month)
     //                                 ->whereYear('created_at', now()->year)
     //                                 ->count(),
-            
+
     //         'active_users' =>Account::where('is_active', true)->count(),
 
     //         'user_this_year' =>Account::selectRaw('Month(created_at) as month, COUNT(*) as total')
@@ -69,14 +69,14 @@ class Dashboard extends Controller
     //                                 ->groupBy('month')
     //                                 ->orderBy('month')
     //                                 ->pluck('revenue', 'month'),
-            
+
     //         'geo_marketing' => UserAddress::selectRaw('city, COUNT(*) as total')
     //                                 ->groupBy('city')
     //                                 ->orderBy('total')
     //                                 ->take(5)
     //                                 ->pluck('total','city')
 
-            
+
     //     ]);
     // }
 
@@ -202,43 +202,55 @@ private function orders(): array
             ];
         });
     }
-    
-        private function traffic(): array{
-        return Cache::remember('dashboard.traffic', now()->addMinutes(15), function () {
-            return [
-                // users by address
-                'users_by_address'   => UserAddress::selectRaw('address, COUNT(*) as total')
-                                            ->groupBy('address')
-                                            ->orderByDesc('total')
-                                            ->take(10)
-                                            ->pluck('total', 'address'),
 
-                // orders by address (join with checkouts)
-                'orders_by_address'  => UserAddress::selectRaw('user_addresses.address, COUNT(checkouts.checkout_id) as total')
-                                            ->join('checkouts', 'checkouts.user_id', '=', 'user_addresses.user_id')
-                                            ->groupBy('user_addresses.address')
-                                            ->orderByDesc('total')
-                                            ->take(10)
-                                            ->pluck('total', 'address'),
+        private function traffic(): array {
+    return Cache::remember('dashboard.traffic', now()->addMinutes(15), function () {
+        return [
+            // users by address (pwede panatilihin, galing sa user_addresses)
+            'users_by_address'   => UserAddress::selectRaw('city, COUNT(*) as total')
+                                        ->whereNotNull('city')
+                                        ->where('city', '!=', '')
+                                        ->groupBy('city')
+                                        ->orderByDesc('total')
+                                        ->take(10)
+                                        ->pluck('total', 'city'),
 
-                // revenue by address
-                'revenue_by_address' => UserAddress::selectRaw('user_addresses.address, SUM(checkouts.paid_amount) as revenue')
-                                            ->join('checkouts', 'checkouts.user_id', '=', 'user_addresses.user_id')
-                                            ->groupBy('user_addresses.address')
-                                            ->orderByDesc('revenue')
-                                            ->take(10)
-                                            ->pluck('revenue', 'address'),
+            // orders by city (galing na sa checkouts.delivery_address)
+            'orders_by_address'  => DB::table('checkouts')
+                                        ->selectRaw("
+                                            JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) as city,
+                                            COUNT(*) as total
+                                        ")
+                                        ->whereRaw("JSON_EXTRACT(delivery_address, '$.city') IS NOT NULL")
+                                        ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) != ''")
+                                        ->groupByRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city'))")
+                                        ->orderByDesc('total')
+                                        ->take(10)
+                                        ->pluck('total', 'city'),
 
-                // users by company
-                'by_company'         => UserAddress::selectRaw('company_name, COUNT(*) as total')
-                                            ->whereNotNull('company_name')
-                                            ->groupBy('company_name')
-                                            ->orderByDesc('total')
-                                            ->take(10)
-                                            ->pluck('total', 'company_name'),
-            ];
-        });
-    }
+            // ── PANGUNAHING BINAGO — revenue by city galing sa checkouts ──
+            'revenue_by_address' => DB::table('checkouts')
+                                        ->selectRaw("
+                                            JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) as city,
+                                            SUM(paid_amount) as revenue
+                                        ")
+                                        ->whereRaw("JSON_EXTRACT(delivery_address, '$.city') IS NOT NULL")
+                                        ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) != ''")
+                                        ->groupByRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city'))")
+                                        ->orderByDesc('revenue')
+                                        ->take(10)
+                                        ->pluck('revenue', 'city'),
+
+            // users by company (unchanged)
+            'by_company'         => UserAddress::selectRaw('company_name, COUNT(*) as total')
+                                        ->whereNotNull('company_name')
+                                        ->groupBy('company_name')
+                                        ->orderByDesc('total')
+                                        ->take(10)
+                                        ->pluck('total', 'company_name'),
+        ];
+    });
+}
         private function contacts(): array
     {
         return Cache::remember('dashboard.contacts', now()->addMinutes(5), function () {
@@ -248,7 +260,7 @@ private function orders(): array
                 'pending' => Contact::where('status', 'pending')->count(),
                 'read'    => Contact::where('status', 'read')->count(),
                 'replied' => Contact::where('status', 'replied')->count(),
-                
+
                 'recent'  => Contact::latest()
                             ->take(6)
                             ->get([
@@ -269,8 +281,9 @@ private function orders(): array
             return[
                 'total' => Product::count(),
                 'on_sale' => Product::where('isSale',true)->count(),
-                'low_stock' => Product::where('product_stocks', '<=', 5)->count(),
-                'out_stock' => Product::where('product_stocks', 0 )->count(),
+                'in_stock'  => Product::where('status', 'in_stock')->count(),
+                'pre_order' => Product::where('status', 'pre_order')->count(),
+                'pre_order' => Product::where('status', 'pre_order')->count(),
                 'recent' =>Product::latest()
                                     -> take(6)
                                     -> get([
@@ -287,7 +300,7 @@ private function orders(): array
 
     private function notifications() : array{
         return Cache::remember('dashboard.notifications', now()->addMinute(5), function () {
-            
+
             return[
                 'total' => DB::table('notifications')->count(),
                 'unread' => DB::table('notifications')->where('is_read', false) -> count(),
@@ -304,7 +317,7 @@ private function orders(): array
                                         'created_at',
                                     ]),
             ];
-            
+
         });
     }
 
