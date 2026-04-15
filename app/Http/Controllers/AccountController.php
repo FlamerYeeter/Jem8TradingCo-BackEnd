@@ -263,6 +263,7 @@ class AccountController extends Controller
                         ? $user->profile_image
                         : asset('storage/' . $user->profile_image))
                     : null,
+                'tin_number'        => $user->tin_number ?? null,
                 'email_verified_at' => $user->email_verified_at,
                 'created_at'        => $user->created_at,
             ]
@@ -284,6 +285,7 @@ class AccountController extends Controller
             'company_name' => 'sometimes|nullable|string|max:255',
             'position'     => 'sometimes|nullable|string|max:255',
             'business_type'=> 'sometimes|nullable|string|max:255',
+            'tin_number' => 'sometimes|nullable|string|min:9|max:12|regex:/^\d{9,12}$/',
         ]);
 
         $user->update($validated);

@@ -1,9 +1,5 @@
 <?php
 
-// ============================================================
-// DeliveryController.php
-// ============================================================
-
 namespace App\Http\Controllers;
 
 use App\Models\Checkout;
@@ -16,7 +12,7 @@ use Illuminate\Support\Facades\Auth;
 class DeliveryController extends Controller
 {
     // =========================================================
-    // ADMIN: ALL DELIVERIES (ALL USERS OR FILTERABLE)
+    // ADMIN: ALL DELIVERIES
     // =========================================================
     public function index(Request $request)
     {
@@ -27,11 +23,10 @@ class DeliveryController extends Controller
 
         $query = Delivery::with([
             'checkout.user',
-            'checkout.items.product',
+            'checkout.items.product.images',
             'checkout.receipt',
         ]);
 
-        // optional filter
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
@@ -54,7 +49,7 @@ class DeliveryController extends Controller
                         'paid_amount' => $checkout->paid_amount,
                         'created_at' => $checkout->created_at,
 
-                        // ✅ RECEIPT
+                        // RECEIPT
                         'receipt' => $checkout->receipt ? [
                             'receipt_id' => $checkout->receipt->receipt_id,
                             'receipt_number' => $checkout->receipt->receipt_number,
@@ -63,34 +58,32 @@ class DeliveryController extends Controller
                                 : null,
                         ] : null,
 
-                        // ✅ MULTIPLE ITEMS
+                        // ITEMS
                         'items' => $checkout->items->map(function ($item) {
 
-                        $product = $item->product;
+                            $product = $item->product;
 
-                        return [
-                            'product_id'   => $item->product_id,
-                            'quantity'     => $item->quantity,
-                            'price'        => $item->price,
-                            'total'        => $item->price * $item->quantity,
+                            return [
+                                'product_id'   => $item->product_id,
+                                'quantity'     => $item->quantity,
+                                'price'        => $item->price,
+                                'total'        => $item->price * $item->quantity,
 
-                            // ✅ FULL PRODUCT DETAILS
-                            'product' => $product ? [
-                                'product_id'    => $product->product_id,
-                                'product_name'  => $product->product_name,
-                                'description'   => $product->description ?? null,
-                                'price'         => $product->price,
-                                'status'        => $product->status ?? null,
-                                'stock'         => $product->stock ?? null,
+                                'product' => $product ? [
+                                    'product_id'   => $product->product_id,
+                                    'product_name' => $product->product_name,
+                                    'description'  => $product->description,
+                                    'price'        => $product->price,
+                                    'status'       => $product->status,
+                                    'stock'        => $product->stock,
 
-                                // images (adjust if you have relation)
-                                'image' => $product->primary_image_url
-                                    ?? (optional($product->images->first())->image_path
-                                        ? asset('storage/' . $product->images->first()->image_path)
-                                        : null),
-                            ] : null,
-                        ];
-                    }),
+                                    'image' => $product->primary_image_url
+                                        ?? (optional($product->images->first())->image_path
+                                            ? asset('storage/' . $product->images->first()->image_path)
+                                            : null),
+                                ] : null,
+                            ];
+                        }),
                     ] : null,
                 ];
             });
@@ -113,17 +106,22 @@ class DeliveryController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
+        // ✅ ACCOUNT (WITH TIN + COMPANY + IMAGE)
         $account = Account::select(
             'id',
             'first_name',
             'last_name',
             'phone_number',
             'email',
-            'profile_image'
-        )->where('id', $user->id)->first();
+            'profile_image',
+            'company_name',
+            'tin_number'
+        )
+        ->where('id', $user->id)
+        ->first();
 
         $checkouts = Checkout::with([
-            'items.product',
+            'items.product.images',
             'receipt',
             'delivery'
         ])
@@ -144,7 +142,7 @@ class DeliveryController extends Controller
                     'special_instructions' => $checkout->special_instructions,
                     'created_at' => $checkout->created_at,
 
-                    // ✅ RECEIPT
+                    // RECEIPT
                     'receipt' => $checkout->receipt ? [
                         'receipt_id' => $checkout->receipt->receipt_id,
                         'receipt_number' => $checkout->receipt->receipt_number,
@@ -153,7 +151,7 @@ class DeliveryController extends Controller
                             : null,
                     ] : null,
 
-                    // ✅ MULTIPLE ITEMS
+                    // ITEMS + IMAGE FIX
                     'items' => $checkout->items->map(function ($item) {
 
                         $product = $item->product;
@@ -165,7 +163,6 @@ class DeliveryController extends Controller
                             'quantity'     => $item->quantity,
                             'total'        => $item->price * $item->quantity,
 
-                            // ✅ ADD THIS (IMAGE FIX)
                             'image' => $product?->primary_image_url
                                 ?? (optional($product->images->first())->image_path
                                     ? asset('storage/' . $product->images->first()->image_path)
@@ -184,13 +181,22 @@ class DeliveryController extends Controller
         ]);
 
         return response()->json([
-            'account' => $account,
+            'account' => [
+                'id'           => $account->id,
+                'first_name'   => $account->first_name,
+                'last_name'    => $account->last_name,
+                'phone_number' => $account->phone_number,
+                'email'        => $account->email,
+                'profile_image'=> $account->profile_image,
+                'company_name' => $account->company_name,
+                'tin_number'   => $account->tin_number,
+            ],
             'orders' => $orders
         ], 200);
     }
 
     // =========================================================
-    // UPDATE DELIVERY STATUS (ADMIN / DRIVER)
+    // UPDATE DELIVERY STATUS
     // =========================================================
     public function updateStatus(Request $request, $deliveryId)
     {

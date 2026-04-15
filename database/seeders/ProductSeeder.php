@@ -138,7 +138,6 @@ class ProductSeeder extends Seeder
             return [
                 'product_name'   => $product['product_name'],
                 'category_id'    => $categories[$product['category_name']],
-                'product_stocks' => 0,
                 'description'    => null,
                 'price'          => $product['price'],
                 'isSale'         => false,
