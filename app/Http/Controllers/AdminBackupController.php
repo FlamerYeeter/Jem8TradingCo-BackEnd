@@ -643,7 +643,7 @@ class AdminBackupController extends Controller
 
         // Add --set-gtid-purged=OFF to suppress GTID warnings on some MySQL setups
         $command = sprintf(
-            '"%s" --user=%s --password=%s --host=%s --set-gtid-purged=OFF --single-transaction --routines --triggers %s -r "%s" 2>&1',
+        '"%s" --user=%s --password=%s --host=%s --single-transaction --routines --triggers %s -r "%s" 2>&1',
             $mysqldump,
             escapeshellarg($user),
             escapeshellarg($password),

@@ -6,20 +6,22 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::disableForeignKeyConstraints();
 
         Schema::table('checkouts', function (Blueprint $table) {
-            $table->dropForeign(['cart_id']);
 
-            $table->foreign('cart_id')
-                ->references('cart_id')
-                ->on('cart')          // ✅ correct table name
-                ->onDelete('cascade');
+            // ❌ remove cart_id (old wrong design)
+            if (Schema::hasColumn('checkouts', 'cart_id')) {
+                $table->dropForeign(['cart_id']);
+                $table->dropColumn('cart_id');
+            }
+
+            // ✅ add delivery_address (JSON)
+            if (!Schema::hasColumn('checkouts', 'delivery_address')) {
+                $table->json('delivery_address')->nullable()->after('payment_details');
+            }
         });
 
         Schema::enableForeignKeyConstraints();
@@ -30,7 +32,14 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
 
         Schema::table('checkouts', function (Blueprint $table) {
-            $table->dropForeign(['cart_id']);
+
+            // rollback delivery_address
+            if (Schema::hasColumn('checkouts', 'delivery_address')) {
+                $table->dropColumn('delivery_address');
+            }
+
+            // restore cart_id (if rollback)
+            $table->unsignedBigInteger('cart_id')->nullable();
 
             $table->foreign('cart_id')
                 ->references('cart_id')

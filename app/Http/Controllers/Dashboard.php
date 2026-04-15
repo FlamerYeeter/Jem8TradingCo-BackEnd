@@ -290,7 +290,6 @@ private function orders(): array
                                         'product_id',
                                         'product_name',
                                         'price',
-                                        'product_stocks',
                                         'isSale',
                                         'created_at',
                                     ]),
