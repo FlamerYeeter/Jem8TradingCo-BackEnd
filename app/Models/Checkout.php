@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Account;
 
 class Checkout extends Model
 {
@@ -14,7 +15,7 @@ class Checkout extends Model
 
     protected $fillable = [
         'user_id',
-        'cart_id',              
+        'cart_id',
         'discount_id',
         'payment_method',
         'payment_details',
@@ -22,10 +23,12 @@ class Checkout extends Model
         'paid_amount',
         'paid_at',
         'special_instructions',
+        'delivery_address',
     ];
 
     protected $casts = [
         'payment_details' => 'array',
+        'delivery_address' => 'array',
         'shipping_fee'    => 'double',
         'paid_amount'     => 'double',
         'paid_at'         => 'datetime',
@@ -33,7 +36,7 @@ class Checkout extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(Account::class, 'user_id');
     }
 
     public function cart()
@@ -52,5 +55,9 @@ class Checkout extends Model
     public function receipt()
     {
         return $this->hasOne(\App\Models\Receipt::class, 'checkout_id', 'checkout_id');
+    }
+    public function items()
+    {
+        return $this->hasMany(\App\Models\CheckoutItem::class, 'checkout_id', 'checkout_id');
     }
 }

@@ -196,6 +196,41 @@ class AdminProductController extends Controller
     public function updateProduct(Request $request, $id)
     {
         try {
+            // Normalize remove_images input so validation sees an array of IDs
+            if ($request->has('remove_images')) {
+                $remove = $request->input('remove_images');
+
+                if (is_string($remove)) {
+                    // If it's a JSON array string, decode it
+                    $decoded = json_decode($remove, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $request->merge(['remove_images' => array_values($decoded)]);
+                    } elseif (strpos($remove, ',') !== false) {
+                        // Comma-separated list
+                        $parts = array_filter(array_map('trim', explode(',', $remove)), function ($v) {
+                            return $v !== '';
+                        });
+                        $request->merge(['remove_images' => array_values($parts)]);
+                    } else {
+                        // Single scalar value
+                        $request->merge(['remove_images' => [$remove]]);
+                    }
+                } elseif (!is_array($remove)) {
+                    // Coerce other scalar types into array
+                    $request->merge(['remove_images' => [$remove]]);
+                }
+
+                // Cast numeric-looking values to int where possible
+                $normalized = array_map(function ($v) {
+                    if (is_numeric($v)) {
+                        return (int)$v;
+                    }
+                    return $v;
+                }, $request->input('remove_images'));
+
+                $request->merge(['remove_images' => $normalized]);
+            }
+
             $request->validate([
                 'product_name'   => 'sometimes|required|string',
                 'category_id'    => 'sometimes|required|integer|exists:categories,category_id',

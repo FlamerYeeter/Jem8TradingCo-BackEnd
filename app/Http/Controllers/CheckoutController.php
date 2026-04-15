@@ -56,7 +56,6 @@ class CheckoutController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // ── Validate incoming request ─────────────────────────────────────
         $request->validate([
             'cart_ids'             => 'required|array|min:1',
             'payment_method'       => 'required|string|max:255',
@@ -68,18 +67,10 @@ class CheckoutController extends Controller
 
         $cartIds = $request->input('cart_ids');
 
-        // ── Fetch only the selected cart items for this user ──────────────
         $cartItems = Cart::where('user_id', $user->id)
             ->whereIn('cart_id', $cartIds)
             ->with('product')
             ->get();
-
-        // Add this temporarily
-        Log::info('Cart lookup', [
-            'requested_ids' => $cartIds,
-            'found_ids'     => $cartItems->pluck('cart_id')->toArray(),
-            'user_id'       => $user->id,
-        ]);
 
         if ($cartItems->isEmpty()) {
             return response()->json(['message' => 'No valid cart items found'], 400);
@@ -88,16 +79,16 @@ class CheckoutController extends Controller
         $method      = $request->input('payment_method');
         $details     = $request->input('payment_details', []);
         $shippingFee = (float) $request->input('shipping_fee', 0);
+        $deliveryAddress = $details['billing_address'] ?? null;
 
-        // ── Validate payment-method-specific fields ───────────────────────
+        // ✅ PAYMENT VALIDATION
         switch ($method) {
             case 'gcash':
             case 'maya':
                 $request->validate([
                     'payment_details.mobile_number' => 'required|string',
                     'payment_details.account_name'  => 'required|string',
-                        
-                ]);
+                ]);  
                 $paymentDetails = [
                     'mobile_number' => $details['mobile_number'],
                     'account_name'  => $details['account_name'],
@@ -106,32 +97,11 @@ class CheckoutController extends Controller
 
             case 'bank_transfer':
                 $request->validate([
-                    'payment_details.bank_name'        => 'required|string',
-                    'payment_details.account_name'     => 'required|string',
-                    'payment_details.account_number'   => 'required|string',
-                    'payment_details.reference_number' => 'nullable|string',
+                    'payment_details.bank_name'      => 'required|string',
+                    'payment_details.account_name'   => 'required|string',
+                    'payment_details.account_number' => 'required|string',
                 ]);
-                $paymentDetails = [
-                    'bank_name'        => $details['bank_name'],
-                    'account_name'     => $details['account_name'],
-                    'account_number'   => $details['account_number'],
-                    'reference_number' => $details['reference_number'] ?? null,
-                ];
-                break;
-
-            case 'check':
-                $request->validate([
-                    'payment_details.bank_name'    => 'required|string',
-                    'payment_details.check_number' => 'required|string',
-                    'payment_details.check_date'   => 'required|date',
-                    'payment_details.check_amount' => 'required|numeric',
-                ]);
-                $paymentDetails = [
-                    'bank_name'    => $details['bank_name'],
-                    'check_number' => $details['check_number'],
-                    'check_date'   => $details['check_date'],
-                    'check_amount' => $details['check_amount'],
-                ];
+                $paymentDetails = $details;
                 break;
 
             case 'cod':
@@ -142,140 +112,150 @@ class CheckoutController extends Controller
                 return response()->json(['message' => 'Invalid payment method'], 400);
         }
 
-        // ── Calculate grand total & check stock ───────────────────────────
+        // ✅ COMPUTE TOTAL
         $grandTotal = 0;
         foreach ($cartItems as $item) {
-            $price = (float) ($item->product->price ?? 0);
-            $grandTotal += $price * (int) $item->quantity;
-
-            if (
-                isset($item->product->product_stocks) &&
-                $item->product->product_stocks < $item->quantity
-            ) {
-                return response()->json([
-                    'message'    => 'Insufficient stock for: ' . $item->product->product_name,
-                    'product_id' => $item->product_id,
-                ], 400);
-            }
+            $grandTotal += (float)$item->product->price * $item->quantity;
         }
 
         $paidAmount = $grandTotal + $shippingFee;
         $paidAt     = in_array($method, ['gcash', 'maya']) ? now() : null;
 
+        // =====================================================
+        // RECEIPT IMAGE UPLOAD (FIXED LIKE PROFILE IMAGE STYLE)
+        // =====================================================
         $receiptImagePath = null;
 
         if ($request->hasFile('receipt_image')) {
-            $receiptImagePath = $request->file('receipt_image')
-                ->store('receipts', 'public');
+
+            $image = $request->file('receipt_image');
+
+            Log::info('=== RECEIPT UPLOAD ===');
+            Log::info('Has file?', ['has_file' => $request->hasFile('receipt_image')]);
+
+            if (!$image->isValid()) {
+                throw new \Exception('Invalid receipt image file');
+            }
+
+            // Create directory: public/storage/receipts
+            $uploadPath = public_path('storage/receipts');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0777, true);
+                Log::info('Created receipts directory: ' . $uploadPath);
+            }
+
+            // Delete old file if needed (optional safety)
+            // not needed for checkout usually
+
+            // Generate unique filename
+            $extension = $image->getClientOriginalExtension();
+            $filename  = time() . '_' . uniqid() . '.' . $extension;
+
+            Log::info('Saving receipt image:', [
+                'filename' => $filename,
+                'size'     => $image->getSize(),
+                'mime'     => $image->getMimeType(),
+            ]);
+
+            // MOVE FILE
+            $image->move($uploadPath, $filename);
+
+            // SAVE RELATIVE PATH (IMPORTANT)
+            $receiptImagePath = 'receipts/' . $filename;
         }
 
         DB::beginTransaction();
         try {
-            // ── Generate a unique receipt number ──────────────────────────
-            do {
-                $receiptNumber = 'RCPT-' . time() . '-' . rand(1000, 9999);
-            } while (DB::table('receipts')->where('receipt_number', $receiptNumber)->exists());
 
-            $paymentReference = json_encode($paymentDetails);
-            $lastCheckout     = null;
-            $receiptId        = null;
+            // ✅ CREATE ONE CHECKOUT ONLY
+            $checkout = Checkout::create([
+                'user_id'              => $user->id,
+                'payment_method'       => $method,
+                'payment_details'      => $paymentDetails,
+                'delivery_address'     => $deliveryAddress,
+                'shipping_fee'         => $shippingFee,
+                'paid_amount'          => $paidAmount,
+                'paid_at'              => $paidAt,
+                'special_instructions' => $request->input('special_instructions'),
+            ]);
 
-            foreach ($cartItems as $cartItem) {
-                // ── Create one Checkout row per cart item ─────────────────
-                $checkout = Checkout::create([
-                    'user_id'              => $user->id,
-                    'cart_id'              => $cartItem->cart_id,  // ✅ properly linked
-                    'discount_id'          => null,
-                    'payment_method'       => $method,
-                    'payment_details'      => $paymentDetails,
-                    'shipping_fee'         => $shippingFee,        // full fee on each; adjust if you want to split
-                    'paid_amount'          => $paidAmount,
-                    'paid_at'              => $paidAt,
-                    'special_instructions' => $request->input('special_instructions'),
-                ]);
-
-                $lastCheckout = $checkout;
-
-                // ── Receipt per checkout row ───────────────────────────────
-                $receiptId = DB::table('receipts')->insertGetId([
-                    'user_id'           => $user->id,
-                    'checkout_id'       => $checkout->checkout_id,
-                    'receipt_number'    => $receiptNumber,
-                    'payment_method'    => $method,
-                    'receipt_image'     => $receiptImagePath,
-                    'payment_reference' => $paymentReference,
-                    'paid_amount'       => $paidAmount,
-                    'paid_at'           => $paidAt,
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
-                ]);
-
-                // ── Delivery row per checkout ──────────────────────────────
-                Delivery::create([
+            // ✅ INSERT MULTIPLE ITEMS
+            foreach ($cartItems as $item) {
+                DB::table('checkout_items')->insert([
                     'checkout_id' => $checkout->checkout_id,
-                    'status'      => 'processing',
-                    'notes'       => $request->input('special_instructions', null),
+                    'product_id'  => $item->product_id,
+                    'quantity'    => $item->quantity,
+                    'price'       => $item->product->price,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
                 ]);
-
-                // ── Deduct stock for immediate-payment methods ─────────────
-                if (in_array($method, ['gcash', 'maya', 'cod'])) {
-                    $product = Product::find($cartItem->product_id);
-                    if ($product && isset($product->product_stocks)) {
-                        $product->product_stocks = max(0, $product->product_stocks - $cartItem->quantity);
-                        $product->save();
-                    }
-                }
             }
 
-            // ── Mark only the selected cart items as checked out ──────────
-            Cart::where('user_id', $user->id)
-                ->whereIn('cart_id', $cartIds)
+            // ✅ UNIQUE RECEIPT (NO DUPLICATE)
+            do {
+                $receiptNumber = 'RCPT-' . now()->timestamp . '-' . random_int(100000, 999999);
+            } while (DB::table('receipts')->where('receipt_number', $receiptNumber)->exists());
+
+            $receiptId = DB::table('receipts')->insertGetId([
+                'user_id'           => $user->id,
+                'checkout_id'       => $checkout->checkout_id,
+                'receipt_number'    => $receiptNumber,
+                'payment_method'    => $method,
+                'receipt_image'     => $receiptImagePath,
+                'payment_reference' => json_encode($paymentDetails),
+                'paid_amount'       => $paidAmount,
+                'paid_at'           => $paidAt,
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+
+            // ✅ DELIVERY (ONE ONLY)
+            Delivery::create([
+                'checkout_id' => $checkout->checkout_id,
+                'status'      => 'processing',
+                'notes'       => $request->input('special_instructions'),
+            ]);
+
+            // ✅ MARK CART AS CHECKED OUT
+            Cart::whereIn('cart_id', $cartIds)
                 ->update(['is_checkout' => true]);
 
-            // ── Activity log ──────────────────────────────────────────────
             ActivityLog::log($user, 'Made a payment', 'payments', [
                 'product_unique_code' => $receiptNumber,
                 'amount'              => $paidAmount,
                 'mode_of_payment'     => $method,
                 'description'         => $user->first_name
-                    . ' placed an order and paid via ' . $method
-                    . ' — Total: ₱' . number_format($paidAmount, 2),
+                    . ' placed an order — ₱' . number_format($paidAmount, 2),
                 'reference_table'     => 'checkouts',
-                'reference_id'        => $lastCheckout->checkout_id,
+                'reference_id'        => $checkout->checkout_id,
             ]);
 
             DB::commit();
 
             return response()->json([
-                'checkout_id'  => $lastCheckout->checkout_id,
-                'user_id'      => $user->id,
-                'paid_amount'  => number_format($paidAmount, 2, '.', ''),
-                'shipping_fee' => number_format($shippingFee, 2, '.', ''),
+                'checkout_id'  => $checkout->checkout_id,
                 'receipt_id'   => $receiptId,
                 'receipt_number' => $receiptNumber,
-
-                // ✅ ADD THIS
-                'receipt_image_url' => $receiptImagePath 
+                'paid_amount'  => number_format($paidAmount, 2, '.', ''),
+                'receipt_image_url' => $receiptImagePath
                     ? asset('storage/' . $receiptImagePath)
                     : null,
 
                 'items' => $cartItems->map(fn($i) => [
-                    'cart_id'    => $i->cart_id,
                     'product_id' => $i->product_id,
                     'quantity'   => $i->quantity,
-                    'price'      => (string) $i->product->price,
-                    'total'      => number_format(
-                        (float) $i->product->price * $i->quantity, 2, '.', ''
-                    ),
+                    'price'      => $i->product->price,
                 ]),
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             Log::error('Checkout failed', [
                 'message' => $e->getMessage(),
                 'user_id' => $user->id,
             ]);
+
             return response()->json([
                 'message' => 'Checkout failed',
                 'error'   => $e->getMessage(),

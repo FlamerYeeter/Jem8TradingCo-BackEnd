@@ -11,9 +11,11 @@ Broadcast::channel('chat.{chatroomId}', function ($user, $chatroomId) {
     // Only allow the owner of the chatroom to join its private channel.
     // You can extend this to allow admins or other participants as needed.
     $ownerId = LiveChat::where('chatroom_id', $chatroomId)->value('user_id');
+    // If there's no owner found, allow only admin (ID = 1) to join.
     if (! $ownerId) {
-        return false;
+        return (int) $user->id === 1;
     }
 
-    return (int) $ownerId === (int) $user->id;
+    // Allow the chat owner or admin (ID = 1) to join any chatroom.
+    return (int) $ownerId === (int) $user->id || (int) $user->id === 1;
 });
