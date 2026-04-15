@@ -20,6 +20,7 @@ class Receipt extends Model
         'payment_reference',
         'paid_amount',
         'paid_at',
+        'receipt_image',
     ];
 
     protected $casts = [

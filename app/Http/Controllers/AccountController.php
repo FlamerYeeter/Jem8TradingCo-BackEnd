@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Mail\VerificationCodeMail;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class AccountController extends Controller
 {
@@ -293,27 +294,88 @@ class AccountController extends Controller
     }
 
     // ==============================
-    // UPDATE PROFILE IMAGE — no log needed
+    // UPDATE PROFILE IMAGE — product-style upload
     // ==============================
     public function updateProfileImage(Request $request)
     {
-        $request->validate([
-            'profile_image' => 'required|image|mimes:jpg,jpeg,png|max:2048'
-        ]);
+        try {
+            $request->validate([
+                'profile_image' => 'required|image|mimes:jpg,jpeg,png|max:2048'
+            ]);
 
-        $user = $request->user();
+            $user = $request->user();
 
-        if ($user->profile_image && !str_starts_with($user->profile_image, 'http')) {
-            Storage::disk('public')->delete($user->profile_image);
+            Log::info('=== UPDATE PROFILE IMAGE ===');
+            Log::info('User ID: ' . $user->id);
+            Log::info('Has file?', ['has_file' => $request->hasFile('profile_image')]);
+
+            if (!$request->hasFile('profile_image')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No image file found in request',
+                ], 400);
+            }
+
+            $image = $request->file('profile_image');
+
+            if (!$image->isValid()) {
+                Log::error('Invalid profile image file', ['error' => $image->getErrorMessage()]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Uploaded file is invalid: ' . $image->getErrorMessage(),
+                ], 400);
+            }
+
+            // Create upload directory if it doesn't exist
+            $uploadPath = public_path('storage/profile_images');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0777, true);
+                Log::info('Created directory: ' . $uploadPath);
+            }
+
+            // Delete old profile image if it exists and is not an external URL
+            if ($user->profile_image && !str_starts_with($user->profile_image, 'http')) {
+                $oldFilePath = public_path('storage/' . $user->profile_image);
+                if (file_exists($oldFilePath)) {
+                    unlink($oldFilePath);
+                    Log::info('Deleted old profile image: ' . $oldFilePath);
+                }
+            }
+
+            // Generate unique filename and move file
+            $extension = $image->getClientOriginalExtension();
+            $filename  = time() . '_' . uniqid() . '.' . $extension;
+
+            Log::info('Saving profile image:', [
+                'filename' => $filename,
+                'size'     => $image->getSize(),
+                'mime'     => $image->getMimeType(),
+            ]);
+
+            $image->move($uploadPath, $filename);
+
+            // Save relative path (matches product pattern: 'profile_images/filename.jpg')
+            $relativePath = 'profile_images/' . $filename;
+            $user->update(['profile_image' => $relativePath]);
+
+            Log::info('Profile image saved successfully', ['path' => $relativePath]);
+
+            return response()->json([
+                'success'           => true,
+                'message'           => 'Profile image updated successfully',
+                'profile_image_url' => asset('storage/' . $relativePath),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Update profile image failed: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update profile image',
+                'error'   => $e->getMessage(),
+            ], 500);
         }
-
-        $path = $request->file('profile_image')->store('profile_images', 'public');
-        $user->update(['profile_image' => $path]);
-
-        return response()->json([
-            'message'           => 'Profile image updated successfully',
-            'profile_image_url' => asset('storage/' . $path)
-        ]);
     }
 
     // ==============================
@@ -332,8 +394,12 @@ class AccountController extends Controller
             'reference_id'    => $id,
         ]);
 
-        if ($user->profile_image) {
-            Storage::disk('public')->delete($user->profile_image);
+        // Delete profile image file if it exists and is not an external URL
+        if ($user->profile_image && !str_starts_with($user->profile_image, 'http')) {
+            $filePath = public_path('storage/' . $user->profile_image);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
         }
 
         $user->tokens()->delete();

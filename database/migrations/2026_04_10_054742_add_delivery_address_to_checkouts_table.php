@@ -8,15 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('checkouts', function (Blueprint $table) {
-            $table->json('delivery_address')->nullable()->after('payment_details');
-        });
+        // Schema::table('checkouts', function (Blueprint $table) {
+        //     $table->json('delivery_address')->nullable()->after('payment_details');
+        // });
     }
 
     public function down(): void
     {
-        Schema::table('checkouts', function (Blueprint $table) {
-            $table->dropColumn('delivery_address');
-        });
+        // Schema::table('checkouts', function (Blueprint $table) {
+        //     $table->dropColumn('delivery_address');
+        // });
     }
 };

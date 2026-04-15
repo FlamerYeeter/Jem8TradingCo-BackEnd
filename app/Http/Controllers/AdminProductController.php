@@ -28,6 +28,7 @@ class AdminProductController extends Controller
                 'images'         => 'sometimes|array',
                 'images.*'       => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
                 'status' => 'nullable|string|in:in_stock,pre_order',
+                'receipt_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
             ]);
 
             // Log request info

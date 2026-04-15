@@ -28,154 +28,148 @@ class CheckoutController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-
-        $orders = Checkout::with(['cart.product', 'delivery'])
+        $orders = Checkout::with(['cart.product', 'delivery', 'receipt'])
             ->where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($order) {
+                $order->receipt_image_url = $order->receipt && $order->receipt->receipt_image
+                    ? asset('storage/' . $order->receipt->receipt_image)
+                    : null;
+
+                return $order;
+            });
 
         ActivityLog::log($user, 'Viewed orders', 'orders', [
             'description'     => $user->first_name . ' viewed their orders list',
             'reference_table' => 'checkouts',
         ]);
 
-
         return response()->json($orders);
     }
 
 
     public function store(Request $request)
-{
-    $user = $request->user();
-    if (!$user) {
-        return response()->json(['message' => 'Unauthenticated'], 401);
-    }
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
 
-    $request->validate([
-        'cart_ids'                       => 'required|array|min:1',
-        'payment_method'                 => 'required|string|max:255',
-        'payment_details'                => 'nullable|array',
-        'shipping_fee'                   => 'sometimes|numeric|min:0',
-        'special_instructions'           => 'sometimes|nullable|string|max:2000',
-        // ── delivery address ──────────────────────────────────────────────
-        'delivery_address'               => 'sometimes|nullable|array',
-        'delivery_address.street'        => 'sometimes|nullable|string|max:500',
-        'delivery_address.barangay'      => 'sometimes|nullable|string|max:255',
-        'delivery_address.city'          => 'sometimes|nullable|string|max:255',
-        'delivery_address.province'      => 'sometimes|nullable|string|max:255',
-        'delivery_address.zip'           => 'sometimes|nullable|string|max:20',
-        'delivery_address.country'       => 'sometimes|nullable|string|max:255',
-    ]);
+        $request->validate([
+            'cart_ids'             => 'required|array|min:1',
+            'payment_method'       => 'required|string|max:255',
+            'payment_details'      => 'nullable|array',
+            'shipping_fee'         => 'sometimes|numeric|min:0',
+            'special_instructions' => 'sometimes|nullable|string|max:2000',
+            'receipt_image'        => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
 
-    $cartIds = $request->input('cart_ids');
+        $cartIds = $request->input('cart_ids');
 
-    $cartItems = Cart::where('user_id', $user->id)
-        ->whereIn('cart_id', $cartIds)
-        ->with('product')
-        ->get();
+        $cartItems = Cart::where('user_id', $user->id)
+            ->whereIn('cart_id', $cartIds)
+            ->with('product')
+            ->get();
 
-    Log::info('Cart lookup', [
-        'requested_ids' => $cartIds,
-        'found_ids'     => $cartItems->pluck('cart_id')->toArray(),
-        'user_id'       => $user->id,
-    ]);
+        if ($cartItems->isEmpty()) {
+            return response()->json(['message' => 'No valid cart items found'], 400);
+        }
 
-    if ($cartItems->isEmpty()) {
-        return response()->json(['message' => 'No valid cart items found'], 400);
-    }
+        $method      = $request->input('payment_method');
+        $details     = $request->input('payment_details', []);
+        $shippingFee = (float) $request->input('shipping_fee', 0);
+        $deliveryAddress = $details['billing_address'] ?? null;
 
-    $method      = $request->input('payment_method');
-    $details     = $request->input('payment_details', []);
-    $shippingFee = (float) $request->input('shipping_fee', 0);
+        // ✅ PAYMENT VALIDATION
+        switch ($method) {
+            case 'gcash':
+            case 'maya':
+                $request->validate([
+                    'payment_details.mobile_number' => 'required|string',
+                    'payment_details.account_name'  => 'required|string',
+                ]);  
+                $paymentDetails = [
+                    'mobile_number' => $details['mobile_number'],
+                    'account_name'  => $details['account_name'],
+                ];
+                break;
 
-    // ── Build delivery address array ──────────────────────────────────────
-    $addr = $request->input('delivery_address', []);
+            case 'bank_transfer':
+                $request->validate([
+                    'payment_details.bank_name'      => 'required|string',
+                    'payment_details.account_name'   => 'required|string',
+                    'payment_details.account_number' => 'required|string',
+                ]);
+                $paymentDetails = $details;
+                break;
 
-    $deliveryAddress = !empty($addr) ? [
-    'street'   => $addr['street']   ?? '',
-    'barangay' => $addr['barangay'] ?? '',
-    'city'     => $addr['city']     ?? '',
-    'province' => $addr['province'] ?? '',
-    'zip'      => $addr['zip']      ?? '',
-    'country'  => $addr['country']  ?? 'Philippines',
-] : null;
+            case 'cod':
+                $paymentDetails = ['type' => 'cash_on_delivery'];
+                break;
 
-    // ── Payment method validation (unchanged) ─────────────────────────────
-    switch ($method) {
-        case 'gcash':
-        case 'maya':
-            $request->validate([
-                'payment_details.mobile_number' => 'required|string',
-                'payment_details.account_name'  => 'required|string',
+            default:
+                return response()->json(['message' => 'Invalid payment method'], 400);
+        }
+
+        // ✅ COMPUTE TOTAL
+        $grandTotal = 0;
+        foreach ($cartItems as $item) {
+            $grandTotal += (float)$item->product->price * $item->quantity;
+        }
+
+        $paidAmount = $grandTotal + $shippingFee;
+        $paidAt     = in_array($method, ['gcash', 'maya']) ? now() : null;
+
+        // =====================================================
+        // RECEIPT IMAGE UPLOAD (FIXED LIKE PROFILE IMAGE STYLE)
+        // =====================================================
+        $receiptImagePath = null;
+
+        if ($request->hasFile('receipt_image')) {
+
+            $image = $request->file('receipt_image');
+
+            Log::info('=== RECEIPT UPLOAD ===');
+            Log::info('Has file?', ['has_file' => $request->hasFile('receipt_image')]);
+
+            if (!$image->isValid()) {
+                throw new \Exception('Invalid receipt image file');
+            }
+
+            // Create directory: public/storage/receipts
+            $uploadPath = public_path('storage/receipts');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0777, true);
+                Log::info('Created receipts directory: ' . $uploadPath);
+            }
+
+            // Delete old file if needed (optional safety)
+            // not needed for checkout usually
+
+            // Generate unique filename
+            $extension = $image->getClientOriginalExtension();
+            $filename  = time() . '_' . uniqid() . '.' . $extension;
+
+            Log::info('Saving receipt image:', [
+                'filename' => $filename,
+                'size'     => $image->getSize(),
+                'mime'     => $image->getMimeType(),
             ]);
-            $paymentDetails = [
-                'mobile_number' => $details['mobile_number'],
-                'account_name'  => $details['account_name'],
-            ];
-            break;
 
-        case 'bank_transfer':
-            $request->validate([
-                'payment_details.bank_name'        => 'required|string',
-                'payment_details.account_name'     => 'required|string',
-                'payment_details.account_number'   => 'required|string',
-                'payment_details.reference_number' => 'nullable|string',
-            ]);
-            $paymentDetails = [
-                'bank_name'        => $details['bank_name'],
-                'account_name'     => $details['account_name'],
-                'account_number'   => $details['account_number'],
-                'reference_number' => $details['reference_number'] ?? null,
-            ];
-            break;
+            // MOVE FILE
+            $image->move($uploadPath, $filename);
 
-        case 'check':
-            $request->validate([
-                'payment_details.bank_name'    => 'required|string',
-                'payment_details.check_number' => 'required|string',
-                'payment_details.check_date'   => 'required|date',
-                'payment_details.check_amount' => 'required|numeric',
-            ]);
-            $paymentDetails = [
-                'bank_name'    => $details['bank_name'],
-                'check_number' => $details['check_number'],
-                'check_date'   => $details['check_date'],
-                'check_amount' => $details['check_amount'],
-            ];
-            break;
+            // SAVE RELATIVE PATH (IMPORTANT)
+            $receiptImagePath = 'receipts/' . $filename;
+        }
 
-        case 'cod':
-            $paymentDetails = ['type' => 'cash_on_delivery'];
-            break;
+        DB::beginTransaction();
+        try {
 
-        default:
-            return response()->json(['message' => 'Invalid payment method'], 400);
-    }
-
-    $grandTotal = 0;
-    foreach ($cartItems as $item) {
-        $price = (float) ($item->product->price ?? 0);
-        $grandTotal += $price * (int) $item->quantity;
-    }
-
-    $paidAmount = $grandTotal + $shippingFee;
-    $paidAt     = in_array($method, ['gcash', 'maya']) ? now() : null;
-
-    DB::beginTransaction();
-    try {
-        do {
-            $receiptNumber = 'RCPT-' . time() . '-' . rand(1000, 9999);
-        } while (DB::table('receipts')->where('receipt_number', $receiptNumber)->exists());
-
-        $paymentReference = json_encode($paymentDetails);
-        $lastCheckout     = null;
-        $receiptId        = null;
-
-        foreach ($cartItems as $cartItem) {
+            // ✅ CREATE ONE CHECKOUT ONLY
             $checkout = Checkout::create([
                 'user_id'              => $user->id,
-                'cart_id'              => $cartItem->cart_id,
-                'discount_id'          => null,
                 'payment_method'       => $method,
                 'payment_details'      => $paymentDetails,
                 'delivery_address'     => $deliveryAddress,
@@ -185,72 +179,87 @@ class CheckoutController extends Controller
                 'special_instructions' => $request->input('special_instructions'),
             ]);
 
-            $lastCheckout = $checkout;
+            // ✅ INSERT MULTIPLE ITEMS
+            foreach ($cartItems as $item) {
+                DB::table('checkout_items')->insert([
+                    'checkout_id' => $checkout->checkout_id,
+                    'product_id'  => $item->product_id,
+                    'quantity'    => $item->quantity,
+                    'price'       => $item->product->price,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+            }
+
+            // ✅ UNIQUE RECEIPT (NO DUPLICATE)
+            do {
+                $receiptNumber = 'RCPT-' . now()->timestamp . '-' . random_int(100000, 999999);
+            } while (DB::table('receipts')->where('receipt_number', $receiptNumber)->exists());
 
             $receiptId = DB::table('receipts')->insertGetId([
                 'user_id'           => $user->id,
                 'checkout_id'       => $checkout->checkout_id,
                 'receipt_number'    => $receiptNumber,
                 'payment_method'    => $method,
-                'payment_reference' => $paymentReference,
+                'receipt_image'     => $receiptImagePath,
+                'payment_reference' => json_encode($paymentDetails),
                 'paid_amount'       => $paidAmount,
                 'paid_at'           => $paidAt,
                 'created_at'        => now(),
                 'updated_at'        => now(),
             ]);
 
+            // ✅ DELIVERY (ONE ONLY)
             Delivery::create([
                 'checkout_id' => $checkout->checkout_id,
                 'status'      => 'processing',
-                'notes'       => $request->input('special_instructions', null),
+                'notes'       => $request->input('special_instructions'),
             ]);
+
+            // ✅ MARK CART AS CHECKED OUT
+            Cart::whereIn('cart_id', $cartIds)
+                ->update(['is_checkout' => true]);
+
+            ActivityLog::log($user, 'Made a payment', 'payments', [
+                'product_unique_code' => $receiptNumber,
+                'amount'              => $paidAmount,
+                'mode_of_payment'     => $method,
+                'description'         => $user->first_name
+                    . ' placed an order — ₱' . number_format($paidAmount, 2),
+                'reference_table'     => 'checkouts',
+                'reference_id'        => $checkout->checkout_id,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'checkout_id'  => $checkout->checkout_id,
+                'receipt_id'   => $receiptId,
+                'receipt_number' => $receiptNumber,
+                'paid_amount'  => number_format($paidAmount, 2, '.', ''),
+                'receipt_image_url' => $receiptImagePath
+                    ? asset('storage/' . $receiptImagePath)
+                    : null,
+
+                'items' => $cartItems->map(fn($i) => [
+                    'product_id' => $i->product_id,
+                    'quantity'   => $i->quantity,
+                    'price'      => $i->product->price,
+                ]),
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Checkout failed', [
+                'message' => $e->getMessage(),
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'message' => 'Checkout failed',
+                'error'   => $e->getMessage(),
+            ], 500);
         }
-
-        Cart::where('user_id', $user->id)
-            ->whereIn('cart_id', $cartIds)
-            ->update(['is_checkout' => true]);
-
-        ActivityLog::log($user, 'Made a payment', 'payments', [
-            'product_unique_code' => $receiptNumber,
-            'amount'              => $paidAmount,
-            'mode_of_payment'     => $method,
-            'description'         => $user->first_name
-                . ' placed an order and paid via ' . $method
-                . ' — Total: ₱' . number_format($paidAmount, 2),
-            'reference_table'     => 'checkouts',
-            'reference_id'        => $lastCheckout->checkout_id,
-        ]);
-
-        DB::commit();
-
-        return response()->json([
-            'checkout_id'    => $lastCheckout->checkout_id,
-            'user_id'        => $user->id,
-            'paid_amount'    => number_format($paidAmount, 2, '.', ''),
-            'shipping_fee'   => number_format($shippingFee, 2, '.', ''),
-            'receipt_id'     => $receiptId,
-            'receipt_number' => $receiptNumber,
-            'items'          => $cartItems->map(fn($i) => [
-                'cart_id'    => $i->cart_id,
-                'product_id' => $i->product_id,
-                'quantity'   => $i->quantity,
-                'price'      => (string) $i->product->price,
-                'total'      => number_format(
-                    (float) $i->product->price * $i->quantity, 2, '.', ''
-                ),
-            ]),
-        ], 201);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Checkout failed', [
-            'message' => $e->getMessage(),
-            'user_id' => $user->id,
-        ]);
-        return response()->json([
-            'message' => 'Checkout failed',
-            'error'   => $e->getMessage(),
-        ], 500);
     }
-}
 }
