@@ -52,6 +52,21 @@ class NewMessage implements ShouldBroadcast
             }
         }
 
+        // ensure attachments loaded
+        $this->message->loadMissing('attachments');
+
+        $attachments = [];
+        foreach ($this->message->attachments ?? [] as $att) {
+            $attachments[] = [
+                'id' => $att->id,
+                'url' => asset('storage/' . ltrim($att->path, '/')),
+                'filename' => $att->filename,
+                'mime' => $att->mime,
+                'size' => $att->size,
+                'thumbnail_url' => $att->thumbnail_path ? asset('storage/' . ltrim($att->thumbnail_path, '/')) : null,
+            ];
+        }
+
         return [
             'message' => [
                 'id' => $this->message->message_id,
@@ -67,6 +82,7 @@ class NewMessage implements ShouldBroadcast
                     'first_name' => $user->first_name,
                     'last_name' => $user->last_name,
                 ] : null,
+                'attachments' => $attachments,
             ],
         ];
     }
