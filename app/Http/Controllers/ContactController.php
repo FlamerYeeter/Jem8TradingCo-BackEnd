@@ -71,6 +71,9 @@ class ContactController extends Controller
     public function show($id)
     {
         try {
+            if (empty($id) || !is_numeric($id)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $contact = Contact::findOrFail($id);
 
             // ✅ Log: admin viewed a contact
@@ -91,6 +94,9 @@ class ContactController extends Controller
     public function updateStatus(Request $request, $id)
     {
         try {
+            if (empty($id) || !is_numeric($id)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $request->validate([
                 'status' => 'required|in:pending,read,replied',
             ]);
@@ -109,6 +115,9 @@ class ContactController extends Controller
     public function destroy($id)
     {
         try {
+            if (empty($id) || !is_numeric($id)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $contact = Contact::findOrFail($id);
             $name    = $contact->first_name . ' ' . $contact->last_name;
             $contact->delete();
@@ -128,14 +137,17 @@ class ContactController extends Controller
     }
 
     // POST - Reply to contact (admin) — no log needed
-    public function reply(Request $request, $id)
+    public function reply(Request $request, $contactId)
     {
         try {
+            if (empty($contactId) || !is_numeric($contactId)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $request->validate([
                 'reply_message' => 'required|string|max:2000',
             ]);
 
-            $contact = Contact::findOrFail($id);
+            $contact = Contact::findOrFail($contactId);
 
             $replyText = $request->input('reply_message');
 

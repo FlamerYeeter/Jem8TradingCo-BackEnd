@@ -24,6 +24,9 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\ProfileController;
 // Public routes
+// enforce numeric `{id}` route parameter globally
+Route::pattern('id', '[0-9]+');
+
 Route::post('/login', [AccountController::class, 'login']);
 Route::post('/register', [AccountController::class, 'store']);
 Route::post('/verify', [AccountController::class, 'verifyEmail']);
@@ -191,7 +194,9 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
     Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
     Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
-    Route::post('/admin/contacts/{id}/reply', [ContactController::class, 'reply']);
+    // use {contactId} to bypass the global {id} numeric pattern so we can return
+    // a clearer validation error when clients send invalid values like "undefined".
+    Route::post('/admin/contacts/{contactId}/reply', [ContactController::class, 'reply']);
 
 
     Route::put('/accounts/{id}', [AccountController::class, 'update']);
