@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Delivery;
-
+use Illuminate\Support\Facades\Cache;
 
 class CheckoutController extends Controller
 {
@@ -88,7 +88,7 @@ class CheckoutController extends Controller
                 $request->validate([
                     'payment_details.mobile_number' => 'required|string',
                     'payment_details.account_name'  => 'required|string',
-                ]);  
+                ]);
                 $paymentDetails = [
                     'mobile_number' => $details['mobile_number'],
                     'account_name'  => $details['account_name'],
@@ -245,7 +245,16 @@ class CheckoutController extends Controller
             ]);
 
             DB::commit();
-
+                    DB::table('notifications')->insert([
+                    'user_id'    => $checkout->user_id,
+                    'type'       => 'order',
+                    'title'      => 'New Order Placed',
+                    'message'    => "{$user->first_name} {$user->last_name} placed an order of ₱" . number_format($checkout->paid_amount, 2),
+                    'is_read'    => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                Cache::forget('dashboard.notifications');
             return response()->json([
                 'checkout_id'  => $checkout->checkout_id,
                 'receipt_id'   => $receiptId,

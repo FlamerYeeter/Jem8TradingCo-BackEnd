@@ -7,7 +7,9 @@ use App\Models\ProductImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 class AdminProductController extends Controller
 {
     // CREATE Product with multiple images
@@ -120,7 +122,16 @@ class AdminProductController extends Controller
 
             // Load relationships
             $product->load(['category', 'images']);
-
+            DB::table('notifications')->insert([
+                'user_id' => Auth::id(),
+                'type'       => 'product',
+                'title'      => 'New Product Added',
+                'message'    => "\"{$product->product_name}\" was added to the catalog.",
+                'is_read'    => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            Cache::forget('dashboard.notifications');
             return response()->json([
                 'success' => true,
                 'message' => 'Product created successfully',
@@ -328,7 +339,6 @@ class AdminProductController extends Controller
                 $product->images()->first()->update(['is_primary' => true]);
             }
 
-            $product->load(['category', 'images']);
 
             return response()->json([
                 'success' => true,

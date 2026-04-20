@@ -11,7 +11,8 @@ use App\Mail\VerificationCodeMail;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 class AccountController extends Controller
 {
     // ==============================
@@ -57,7 +58,16 @@ class AccountController extends Controller
             'reference_table' => 'accounts',
             'reference_id'    => $account->id,
         ]);
-
+                DB::table('notifications')->insert([
+                    'user_id'    => null,
+                    'type'       => 'user',
+                    'title'      => 'New Account Registered',
+                    'message'    => "{$account->first_name} {$account->last_name} just signed up.",
+                    'is_read'    => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                Cache::forget('dashboard.notifications');
         return response()->json([
             'message' => 'Account created. Please verify your email.',
             'data'    => $account

@@ -9,7 +9,6 @@ use App\Models\Checkout;
 use App\Models\UserAddress;
 use App\Models\Contact;
 use App\Models\Product;
-use App\Models\Notifications;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -298,23 +297,23 @@ private function orders(): array
     }
 
     private function notifications() : array{
-        return Cache::remember('dashboard.notifications', now()->addMinute(5), function () {
+        return Cache::remember('dashboard.notifications', now()->addMinutes(5),function () {
 
             return[
                 'total' => DB::table('notifications')->count(),
                 'unread' => DB::table('notifications')->where('is_read', false) -> count(),
                 'recent' => DB::table('notifications')
-                                    ->latest()
-                                    ->take(5)
-                                    ->get([
-                                        'notification_id',
-                                        'user_id',
-                                        'type',
-                                        'title',
-                                        'message',
-                                        'is_read',
-                                        'created_at',
-                                    ]),
+                ->latest()
+                ->take(5)
+                ->get([
+                    'notification_id',
+                    'user_id',
+                    'type',
+                    'title',
+                    'message',
+                    'is_read',
+                    'created_at',
+                ]),
             ];
 
         });

@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\ContactReply;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Auth;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 class ContactController extends Controller
 {
     // ✅ POST - Create contact message (public)
@@ -31,7 +33,16 @@ class ContactController extends Controller
                 'message'      => $request->input('message'),
                 'status'       => 'pending',
             ]);
-
+                 DB::table('notifications')->insert([
+                'user_id'    => null,
+                'type'       => 'contact',
+                'title'      => 'New Contact Message',
+                'message'    => "{$contact->first_name} {$contact->last_name}: " . Str::limit($contact->message, 60),
+                'is_read'    => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            Cache::forget('dashboard.notifications');
             // ✅ Log: only if logged in
             if (Auth::check()) {
                 ActivityLog::log(Auth::user(), 'Sent a contact message', 'contacts', [
