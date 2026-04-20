@@ -82,6 +82,9 @@ class ContactController extends Controller
     public function show($id)
     {
         try {
+            if (empty($id) || !is_numeric($id)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $contact = Contact::findOrFail($id);
 
             // ✅ Log: admin viewed a contact
@@ -102,6 +105,9 @@ class ContactController extends Controller
     public function updateStatus(Request $request, $id)
     {
         try {
+            if (empty($id) || !is_numeric($id)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $request->validate([
                 'status' => 'required|in:pending,read,replied',
             ]);
@@ -120,6 +126,9 @@ class ContactController extends Controller
     public function destroy($id)
     {
         try {
+            if (empty($id) || !is_numeric($id)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $contact = Contact::findOrFail($id);
             $name    = $contact->first_name . ' ' . $contact->last_name;
             $contact->delete();
@@ -139,28 +148,55 @@ class ContactController extends Controller
     }
 
     // POST - Reply to contact (admin) — no log needed
-    public function reply(Request $request, $id)
+    public function reply(Request $request, $contactId)
     {
         try {
+            if (empty($contactId) || !is_numeric($contactId)) {
+                return response()->json(['status' => 'error', 'message' => 'Invalid contact id'], 400);
+            }
             $request->validate([
                 'reply_message' => 'required|string|max:2000',
             ]);
 
-            $contact = Contact::findOrFail($id);
+            $contact = Contact::findOrFail($contactId);
 
-            Mail::to($contact->email)->send(
-                new ContactReply(
-                    $contact->first_name . ' ' . $contact->last_name,
-                    $request->input('reply_message')
-                )
-            );
+            $replyText = $request->input('reply_message');
 
-            $contact->update(['status' => 'replied']);
+            // Queue the reply email
+            try {
+                Mail::to($contact->email)->queue(
+                    new ContactReply(
+                        $contact->first_name . ' ' . $contact->last_name,
+                        $replyText
+                    )
+                );
+            } catch (\Exception $e) {
+                // If queue/send fails, log but continue to save reply state
+                \Illuminate\Support\Facades\Log::error('Failed to queue contact reply email', [
+                    'error' => $e->getMessage(),
+                    'contact_id' => $contact->getKey(),
+                ]);
+            }
+
+            // Save reply details and mark replied
+            $contact->update([
+                'reply_message' => $replyText,
+                'replied_by'    => optional(Auth::user())->id,
+                'replied_at'    => now(),
+                'status'        => 'replied',
+            ]);
+
+            // Log admin reply
+            ActivityLog::log(Auth::user(), 'Replied to contact message', 'contacts', [
+                'description'     => Auth::user()->first_name . ' replied to contact message from: ' . $contact->first_name . ' ' . $contact->last_name,
+                'reference_table' => 'contacts',
+                'reference_id'    => $contact->getKey(),
+            ]);
 
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Reply sent successfully to ' . $contact->email,
-                'data'    => $contact,
+                'message' => 'Reply queued and saved for ' . $contact->email,
+                'data'    => $contact->fresh(),
             ], 200);
 
         } catch (\Exception $e) {

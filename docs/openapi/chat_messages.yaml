@@ -1,0 +1,61 @@
+openapi: 3.0.3
+info:
+  title: Chat Messages API
+  version: 1.0.0
+paths:
+  /api/chat/messages:
+    post:
+      summary: Create a chat message (with optional file uploads)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                chatroom_id:
+                  type: integer
+                messages:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+            encoding:
+              file:
+                contentType: application/octet-stream
+          application/json:
+            schema:
+              type: object
+              properties:
+                chatroom_id:
+                  type: integer
+                messages:
+                  type: string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '401':
+          description: Unauthenticated
+        '413':
+          description: Payload Too Large
+        '415':
+          description: Unsupported Media Type
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

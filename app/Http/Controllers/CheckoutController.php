@@ -118,6 +118,20 @@ class CheckoutController extends Controller
             $grandTotal += (float)$item->product->price * $item->quantity;
         }
 
+        // Enforce COD limit: maximum 3 COD orders per user
+        if (strtolower($method) === 'cod') {
+            $codCount = Checkout::where('user_id', $user->id)
+                ->whereRaw("LOWER(payment_method) = 'cod'")
+                ->count();
+
+            if ($codCount >= 3) {
+                return response()->json([
+                    'message' => 'Cash on Delivery disabled: you have reached the maximum of 3 COD orders.',
+                    'action' => 'Please select a prepaid payment method or apply for payment terms via /payment-terms/apply'
+                ], 403);
+            }
+        }
+
         $paidAmount = $grandTotal + $shippingFee;
         $paidAt     = in_array($method, ['gcash', 'maya']) ? now() : null;
 

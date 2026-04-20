@@ -30,6 +30,9 @@ class Contact extends Model
         'email',
         'message',
         'status',
+        'reply_message',
+        'replied_by',
+        'replied_at',
     ];
 
     /**
@@ -38,6 +41,7 @@ class Contact extends Model
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'replied_at' => 'datetime',
     ];
 
     /**

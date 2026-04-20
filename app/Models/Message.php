@@ -46,4 +46,12 @@ class Message extends Model
     {
         return $this->belongsTo(Account::class, 'user_id');
     }
+
+    /**
+     * Attachments uploaded with this message.
+     */
+    public function attachments()
+    {
+        return $this->hasMany(Attachment::class, 'message_id', 'message_id');
+    }
 }
