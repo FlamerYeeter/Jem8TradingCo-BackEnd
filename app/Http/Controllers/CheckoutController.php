@@ -82,11 +82,7 @@ class CheckoutController extends Controller
         $shippingFee = (float) $request->input('shipping_fee', 0);
         $deliveryAddress = $details['billing_address'] ?? null;
 
-        // Normalize payment method so DB enums match (e.g. 'deposit' => 'bank_transfer')
-        $normalizedMethod = $method;
-        if (in_array($method, ['deposit', 'deposit_payment'], true)) {
-            $normalizedMethod = 'bank_transfer';
-        }
+        // No normalization: store the method as provided (we add 'deposit' to the receipts enum)
 
         // ✅ PAYMENT VALIDATION
         switch ($method) {
@@ -225,7 +221,7 @@ class CheckoutController extends Controller
             // ✅ CREATE ONE CHECKOUT ONLY
             $checkoutData = [
                 'user_id'              => $user->id,
-                'payment_method'       => $normalizedMethod,
+                'payment_method'       => $method,
                 'delivery_address'     => $deliveryAddress,
                 'shipping_fee'         => $shippingFee,
                 'paid_amount'          => $paidAmount,
@@ -261,7 +257,7 @@ class CheckoutController extends Controller
                 'user_id'           => $user->id,
                 'checkout_id'       => $checkout->checkout_id,
                 'receipt_number'    => $receiptNumber,
-                'payment_method'    => $normalizedMethod,
+                'payment_method'    => $method,
                 'receipt_image'     => $receiptImagePath,
                 'payment_reference' => json_encode($paymentDetails),
                 'paid_amount'       => $paidAmount,
@@ -286,7 +282,7 @@ class CheckoutController extends Controller
             ActivityLog::log($user, 'Made a payment', 'payments', [
                 'product_unique_code' => $receiptNumber,
                 'amount'              => $paidAmount,
-                'mode_of_payment'     => $normalizedMethod,
+                'mode_of_payment'     => $method,
                 'description'         => $user->first_name
                     . ' placed an order — ₱' . number_format($paidAmount, 2),
                 'reference_table'     => 'checkouts',
