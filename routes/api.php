@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\EnsureTokenIsValid;
+use Illuminate\Support\Facades\Redis;
 use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\CategoryController;
@@ -177,6 +178,22 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::get('settings',         [AdminsettingsController::class, 'index']);
     Route::post('settings',        [AdminsettingsController::class, 'store']);
     Route::post('change-password', [AdminsettingsController::class, 'changePassword']);
+    // Server-Sent Events endpoint for appearance updates
+    Route::get('appearance/stream', function () {
+        $headers = [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+        ];
+
+        return response()->stream(function () {
+            Redis::subscribe(['appearance-updates'], function ($message) {
+                echo "data: {$message}\n\n";
+                if (function_exists('ob_flush')) { ob_flush(); }
+                flush();
+            });
+        }, 200, $headers);
+    });
     });
 
 });

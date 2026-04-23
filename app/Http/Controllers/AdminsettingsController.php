@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\Fluent\Concerns\Has;
 use App\Models\ActivityLog;
+use Illuminate\Support\Facades\Redis;
 
 class AdminsettingsController extends Controller
 {
@@ -44,6 +45,7 @@ class AdminsettingsController extends Controller
             'sessionTimeout' => 'sometimes|integer|min:1|max:999',
             'primaryColor'   => 'sometimes|string|max:7',
             'theme'          => 'sometimes|in:light,dark,auto',
+            'appearance'     => 'sometimes|in:light,dark,auto',
             'require2FA'     => 'sometimes|boolean',
         ]);
 
@@ -51,7 +53,7 @@ class AdminsettingsController extends Controller
             'siteName', 'siteURL', 'adminEmail', 'contactNumber',
             'companyAddress', 'timezone', 'language',
             'passwordLockout', 'sessionTimeout',
-            'primaryColor', 'theme', 'require2FA',
+            'primaryColor', 'theme', 'appearance', 'require2FA',
         ]);
 
         foreach ($fields as $key => $value) {
@@ -59,6 +61,16 @@ class AdminsettingsController extends Controller
                 ['key' => $key],
                 ['value' => $value]
             );
+        }
+
+        // publish appearance update to Redis so real-time subscribers can react
+        if (array_key_exists('appearance', $fields)) {
+            $payload = json_encode(['appearance' => $fields['appearance']]);
+            try {
+                Redis::publish('appearance-updates', $payload);
+            } catch (\Exception $e) {
+                // non-fatal: publishing failure should not block saving
+            }
         }
 
         return response()->json(['message' => 'Settings saved successfully']);
