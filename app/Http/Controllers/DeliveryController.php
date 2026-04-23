@@ -15,86 +15,92 @@ class DeliveryController extends Controller
     // ADMIN: ALL DELIVERIES
     // =========================================================
     public function index(Request $request)
-    {
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        $query = Delivery::with([
-            'checkout.user',
-            'checkout.items.product.images',
-            'checkout.receipt',
-        ]);
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        $deliveries = $query->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($delivery) {
-
-                $checkout = $delivery->checkout;
-
-                return [
-                    'delivery_id' => $delivery->delivery_id,
-                    'status' => $delivery->status,
-                    'notes' => $delivery->notes,
-                    'created_at' => $delivery->created_at,
-
-                    'checkout' => $checkout ? [
-                        'checkout_id' => $checkout->checkout_id,
-                        'payment_method' => $checkout->payment_method,
-                        'paid_amount' => $checkout->paid_amount,
-                        'created_at' => $checkout->created_at,
-
-                        // RECEIPT
-                        'receipt' => $checkout->receipt ? [
-                            'receipt_id' => $checkout->receipt->receipt_id,
-                            'receipt_number' => $checkout->receipt->receipt_number,
-                            'receipt_image_url' => $checkout->receipt->receipt_image
-                                ? asset('storage/' . $checkout->receipt->receipt_image)
-                                : null,
-                        ] : null,
-
-                        // ITEMS
-                        'items' => $checkout->items->map(function ($item) {
-
-                            $product = $item->product;
-
-                            return [
-                                'product_id'   => $item->product_id,
-                                'quantity'     => $item->quantity,
-                                'price'        => $item->price,
-                                'total'        => $item->price * $item->quantity,
-
-                                'product' => $product ? [
-                                    'product_id'   => $product->product_id,
-                                    'product_name' => $product->product_name,
-                                    'description'  => $product->description,
-                                    'price'        => $product->price,
-                                    'status'       => $product->status,
-                                    'stock'        => $product->stock,
-
-                                    'image' => $product->primary_image_url
-                                        ?? (optional($product->images->first())->image_path
-                                            ? asset('storage/' . $product->images->first()->image_path)
-                                            : null),
-                                ] : null,
-                            ];
-                        }),
-                    ] : null,
-                ];
-            });
-
-        ActivityLog::log($user, 'Viewed deliveries list', 'orders', [
-            'description' => $user->first_name . ' viewed deliveries list',
-            'reference_table' => 'deliveries',
-        ]);
-
-        return response()->json(['deliveries' => $deliveries], 200);
+{
+    $user = $request->user();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
     }
+
+    $query = Delivery::with([
+        'checkout.user',                    // ← already correct
+        'checkout.items.product.images',
+        'checkout.receipt',
+    ]);
+
+    if ($request->has('status')) {
+        $query->where('status', $request->status);
+    }
+
+    $deliveries = $query->orderBy('created_at', 'desc')
+        ->get()
+        ->map(function ($delivery) {
+
+            $checkout = $delivery->checkout;
+
+            return [
+                'delivery_id' => $delivery->delivery_id,
+                'status'      => $delivery->status,
+                'notes'       => $delivery->notes,
+                'created_at'  => $delivery->created_at,
+
+                'checkout' => $checkout ? [
+                    'checkout_id'    => $checkout->checkout_id,
+                    'payment_method' => $checkout->payment_method,
+                    'paid_amount'    => $checkout->paid_amount,
+                    'shipping_fee'   => $checkout->shipping_fee,
+                    'created_at'     => $checkout->created_at,
+
+                    // ✅ ADD THIS BLOCK — was missing entirely before
+                    'user' => $checkout->user ? [
+                        'first_name'   => $checkout->user->first_name,
+                        'last_name'    => $checkout->user->last_name,
+                        'email'        => $checkout->user->email,
+                        'phone_number' => $checkout->user->phone_number,
+                        'company_name' => $checkout->user->company_name ?? null,
+                        'tin_number'   => $checkout->user->tin_number ?? null,
+                    ] : null,
+
+                    'receipt' => $checkout->receipt ? [
+                        'receipt_id'        => $checkout->receipt->receipt_id,
+                        'receipt_number'    => $checkout->receipt->receipt_number,
+                        'receipt_image_url' => $checkout->receipt->receipt_image
+                            ? asset('storage/' . $checkout->receipt->receipt_image)
+                            : null,
+                    ] : null,
+
+                    'items' => $checkout->items->map(function ($item) {
+                        $product = $item->product;
+                        return [
+                            'product_id' => $item->product_id,
+                            'quantity'   => $item->quantity,
+                            'price'      => $item->price,
+                            'total'      => $item->price * $item->quantity,
+                            'product' => $product ? [
+                                'product_id'   => $product->product_id,
+                                'product_name' => $product->product_name,
+                                'description'  => $product->description,
+                                'price'        => $product->price,
+                                'status'       => $product->status,
+                                'stock'        => $product->stock,
+                                'image'        => $product->primary_image_url
+                                    ?? (optional($product->images->first())->image_path
+                                        ? asset('storage/' . $product->images->first()->image_path)
+                                        : null),
+                            ] : null,
+                        ];
+                    }),
+
+                ] : null,
+            ];
+        });
+
+    ActivityLog::log($user, 'Viewed deliveries list', 'orders', [
+        'description'     => $user->first_name . ' viewed deliveries list',
+        'reference_table' => 'deliveries',
+    ]);
+
+    return response()->json(['deliveries' => $deliveries], 200);
+}
 
     // =========================================================
     // USER: OWN DELIVERIES

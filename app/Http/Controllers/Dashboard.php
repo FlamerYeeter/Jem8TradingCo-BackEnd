@@ -318,7 +318,17 @@ private function orders(): array
 
         });
     }
+            public function markNotificationRead($id)
+{
+    DB::table('notifications')
+        ->where('notification_id', $id)
+        ->update(['is_read' => true]);
 
+    // Clear the notifications cache so the next dashboard load reflects the change
+    Cache::forget('dashboard.notifications');
+
+    return response()->json(['success' => true]);
+}
     private function views(): array
     {
         return Cache::remember('dashboard.views', now()->addMinutes(5), function () {
