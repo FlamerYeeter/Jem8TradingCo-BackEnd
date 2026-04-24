@@ -215,30 +215,25 @@ private function orders(): array
                                         ->pluck('total', 'city'),
 
             // orders by city (galing na sa checkouts.delivery_address)
-            'orders_by_address'  => DB::table('checkouts')
-                                        ->selectRaw("
-                                            JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) as city,
-                                            COUNT(*) as total
-                                        ")
-                                        ->whereRaw("JSON_EXTRACT(delivery_address, '$.city') IS NOT NULL")
-                                        ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) != ''")
-                                        ->groupByRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city'))")
-                                        ->orderByDesc('total')
-                                        ->take(10)
-                                        ->pluck('total', 'city'),
+  // orders by city
+'orders_by_address'  => DB::table('checkouts')
+                            ->selectRaw('delivery_city as city, COUNT(*) as total')
+                            ->whereNotNull('delivery_city')
+                            ->where('delivery_city', '!=', '')
+                            ->groupBy('delivery_city')
+                            ->orderByDesc('total')
+                            ->take(10)
+                            ->pluck('total', 'city'),
 
-            // ── PANGUNAHING BINAGO — revenue by city galing sa checkouts ──
-            'revenue_by_address' => DB::table('checkouts')
-                                        ->selectRaw("
-                                            JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) as city,
-                                            SUM(paid_amount) as revenue
-                                        ")
-                                        ->whereRaw("JSON_EXTRACT(delivery_address, '$.city') IS NOT NULL")
-                                        ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city')) != ''")
-                                        ->groupByRaw("JSON_UNQUOTE(JSON_EXTRACT(delivery_address, '$.city'))")
-                                        ->orderByDesc('revenue')
-                                        ->take(10)
-                                        ->pluck('revenue', 'city'),
+// revenue by city
+'revenue_by_address' => DB::table('checkouts')
+                            ->selectRaw('delivery_city as city, SUM(paid_amount) as revenue')
+                            ->whereNotNull('delivery_city')
+                            ->where('delivery_city', '!=', '')
+                            ->groupBy('delivery_city')
+                            ->orderByDesc('revenue')
+                            ->take(10)
+                            ->pluck('revenue', 'city'),
 
             // users by company (unchanged)
             'by_company'         => UserAddress::selectRaw('company_name, COUNT(*) as total')
