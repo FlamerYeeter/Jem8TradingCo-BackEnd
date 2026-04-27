@@ -26,7 +26,8 @@ class admin_leadership extends Model
         'name',
         'position',
         'status',
-        'leadership_img',
+        'team',
+        'leadership_img'
     ];
 
     /**

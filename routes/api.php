@@ -156,7 +156,7 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
 
     Route::get('/dashboard', [Dashboard::class, 'allDashboard']);
-    Route::patch('/notifications/{id}/read', [Dashboard::class, 'markNotificationRead']);
+
     // Chat
 
 
