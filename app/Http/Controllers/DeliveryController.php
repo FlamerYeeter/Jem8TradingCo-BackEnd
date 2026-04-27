@@ -6,6 +6,9 @@ use App\Models\Checkout;
 use App\Models\Delivery;
 use App\Models\Account;
 use App\Models\ActivityLog;
+use App\Models\Notifications as NotificationModel;
+use App\Events\NotificationCreated;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -243,6 +246,26 @@ class DeliveryController extends Controller
             'reference_table' => 'deliveries',
             'reference_id' => $deliveryId,
         ]);
+
+        // Create a notification for the order owner (if available)
+        try {
+            $checkout = $delivery->checkout;
+            if ($checkout && $checkout->user_id) {
+                // Only notify the user when the delivery becomes delivered
+                if ($delivery->status === 'delivered' && $oldStatus !== 'delivered') {
+                    NotificationService::createAndBroadcast(
+                        $checkout->user_id,
+                        'order_status',
+                        'Order delivered',
+                        "Your order #{$checkout->checkout_id} has been delivered.",
+                        'checkout',
+                        $checkout->checkout_id
+                    );
+                }
+            }
+        } catch (\Exception $e) {
+            logger()->error('Failed to create delivery notification: ' . $e->getMessage());
+        }
 
         return response()->json([
             'delivery_id' => $delivery->delivery_id,

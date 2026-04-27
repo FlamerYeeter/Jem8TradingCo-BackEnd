@@ -19,3 +19,14 @@ Broadcast::channel('chat.{chatroomId}', function ($user, $chatroomId) {
     // Allow the chat owner or admin (ID = 1) to join any chatroom.
     return (int) $ownerId === (int) $user->id || (int) $user->id === 1;
 });
+
+// Private channel for user-specific notifications
+Broadcast::channel('private-user.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});
+
+// Also authorize the canonical `user.{id}` channel so server-side events
+// that use `PrivateChannel('user.{id}')` will match the auth callback.
+Broadcast::channel('user.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});

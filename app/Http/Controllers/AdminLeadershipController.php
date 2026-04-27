@@ -133,9 +133,10 @@ class AdminLeadershipController extends Controller
             $leadership = admin_leadership::findOrFail($id);
             $name       = $leadership->name;
 
-            if ($leadership->leadership_img) {
-                Storage::disk('public')->delete($leadership->leadership_img);
-            }
+if ($leadership->leadership_img) {
+    $oldPath = public_path('storage/' . $leadership->leadership_img);
+    if (file_exists($oldPath)) unlink($oldPath);
+}
 
             $leadership->delete();
 

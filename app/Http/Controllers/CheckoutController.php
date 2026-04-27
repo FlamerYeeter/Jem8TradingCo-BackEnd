@@ -285,7 +285,7 @@ if (Schema::hasColumn('checkouts', 'payment_details')) {
             ]);
 
             // ── Create delivery record ────────────────────────────────────
-            Delivery::create([
+            $delivery = Delivery::create([
                 'checkout_id' => $checkout->checkout_id,
                 'status'      => 'processing',
                 'notes'       => $request->input('special_instructions'),
@@ -308,7 +308,7 @@ if (Schema::hasColumn('checkouts', 'payment_details')) {
 
             DB::commit();
 
-            // ── Notification ──────────────────────────────────────────────
+            // ── Notification: keep existing "New Order Placed" behaviour
             DB::table('notifications')->insert([
                 'user_id'    => $checkout->user_id,
                 'type'       => 'order',
@@ -319,6 +319,22 @@ if (Schema::hasColumn('checkouts', 'payment_details')) {
                 'updated_at' => now(),
             ]);
             Cache::forget('dashboard.notifications');
+
+            // If the delivery record was created already with status 'delivered', notify immediately.
+            try {
+                if (isset($delivery) && $delivery->status === 'delivered') {
+                    \App\Services\NotificationService::createAndBroadcast(
+                        $checkout->user_id,
+                        'order_status',
+                        'Order delivered',
+                        "Your order #{$checkout->checkout_id} has been delivered.",
+                        'checkout',
+                        $checkout->checkout_id
+                    );
+                }
+            } catch (\Exception $e) {
+                logger()->error('Failed to create initial delivery notification: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'checkout_id'       => $checkout->checkout_id,
