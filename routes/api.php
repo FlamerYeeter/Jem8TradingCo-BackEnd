@@ -24,7 +24,6 @@ use App\Http\Controllers\AdminsettingsController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\NotificationsController;
 // Public routes
 // enforce numeric `{id}` route parameter globally
 Route::pattern('id', '[0-9]+');
@@ -47,6 +46,7 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::post('/contact', [ContactController::class, 'store']);
 Route::get('/findaccount/{id}', [AccountController::class, 'show']);
 Route::get('/admin-leadership', [AdminLeadershipController::class, 'adminImgIndex']);
+
 
 // Routes that require authentication
 Route::middleware([EnsureTokenIsValid::class])->group(function () {
@@ -86,14 +86,6 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::get('/my-deliveries', [DeliveryController::class, 'indexUser']);
     Route::get('/deliveries', [DeliveryController::class, 'index']);
     Route::patch('/deliveries/{deliveryId}/status', [DeliveryController::class, 'updateStatus']);
-
-    // Notifications
-    Route::get('/notifications', [NotificationsController::class, 'index']);
-    Route::get('/notifications/unread', [NotificationsController::class, 'unreadCount']);
-    Route::post('/notifications/mark-read', [NotificationsController::class, 'markRead']);
-    Route::post('/notifications/mark-all-read', [NotificationsController::class, 'markAllRead']);
-    // Dev helper: simulate a notification for the authenticated user
-    Route::post('/notifications/simulate', [NotificationsController::class, 'simulate']);
 
     Route::get('/showAllUser', [AccountController::class, 'index']);
     Route::get('/showUser/{id}', [AccountController::class, 'show']);
@@ -164,7 +156,7 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::delete('/addresses/{id}', [UserAddressController::class, 'destroy']);
 
     Route::get('/dashboard', [Dashboard::class, 'allDashboard']);
-    Route::patch('/notifications/{id}/read', [Dashboard::class, 'markNotificationRead']);
+
     // Chat
 
 
@@ -220,6 +212,7 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/admin/contacts/{id}',         [ContactController::class, 'show']);
     Route::patch('/admin/contacts/{id}/status',[ContactController::class, 'updateStatus']);
     Route::delete('/admin/contacts/{id}',      [ContactController::class, 'destroy']);
+    Route::patch('/admin/contacts/{id}/resolve', [ContactController::class, 'resolve']);
     // use {contactId} to bypass the global {id} numeric pattern so we can return
     // a clearer validation error when clients send invalid values like "undefined".
     Route::post('/admin/contacts/{contactId}/reply', [ContactController::class, 'reply']);

@@ -114,7 +114,11 @@ class Dashboard extends Controller
                                             ->groupBy('month')
                                             ->orderBy('month')
                                             ->pluck('total', 'month'),
-
+                    'new_per_month_prev' => Account::selectRaw('MONTH(created_at) as month, COUNT(*) as total')
+                            ->whereYear('created_at', now()->year - 1)
+                            ->groupBy('month')
+                            ->orderBy('month')
+                            ->pluck('total', 'month'),
                     'recent'         => Account::latest()
                                             ->take(6)
                                             ->get(['id', 'first_name', 'last_name', 'email', 'created_at', 'email_verified_at']),
@@ -190,14 +194,16 @@ private function orders(): array
                 'total'              => $revenue->total,
                 'this_month'         => $revenue->this_month,
                 'today'              => $revenue->today,
-                'monthly_chart'      => Checkout::selectRaw('MONTH(created_at) as month, SUM(paid_amount) as revenue')
-                                            ->whereYear('created_at', now()->year)
-                                            ->groupBy('month')->orderBy('month')
-                                            ->pluck('revenue', 'month'),
-                'monthly_chart_prev' => Checkout::selectRaw('MONTH(created_at) as month, SUM(paid_amount) as revenue')
-                                            ->whereYear('created_at', now()->year - 1)
-                                            ->groupBy('month')->orderBy('month')
-                                            ->pluck('revenue', 'month'),
+                'monthly_chart' => Checkout::selectRaw('MONTH(paid_at) as month, SUM(paid_amount) as revenue')
+                        ->whereNotNull('paid_at')
+                        ->whereYear('paid_at', now()->year)
+                        ->groupBy('month')->orderBy('month')
+                        ->pluck('revenue', 'month'),
+                'monthly_chart_prev' => Checkout::selectRaw('MONTH(paid_at) as month, SUM(paid_amount) as revenue')
+                                        ->whereNotNull('paid_at')
+                                        ->whereYear('paid_at', now()->year - 1)
+                                        ->groupBy('month')->orderBy('month')
+                                        ->pluck('revenue', 'month'),
             ];
         });
     }
