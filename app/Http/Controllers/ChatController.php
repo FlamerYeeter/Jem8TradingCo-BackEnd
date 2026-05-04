@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
@@ -159,23 +161,23 @@ class ChatController extends Controller
                         $accepted = true;
                         if (str_starts_with($mime, 'image/')) {
                             if ($size > $imageMax) {
-                                return response()->json(['message' => 'Image too large'], 413);
+                                throw new HttpException(413, 'Image too large');
                             }
                         } elseif (str_starts_with($mime, 'video/')) {
                             if ($size > $videoMax) {
-                                return response()->json(['message' => 'Video too large'], 413);
+                                throw new HttpException(413, 'Video too large');
                             }
                         }
                         break;
                     }
                 }
                 if (! $accepted && in_array($mime, $allowedExact, true) === false) {
-                    return response()->json(['message' => 'Unsupported media type: '.$mime], 415);
+                    throw new HttpException(415, 'Unsupported media type: '.$mime);
                 }
                 if (! $accepted && in_array($mime, $allowedExact, true)) {
                     // document size check
                     if ($size > $docMax) {
-                        return response()->json(['message' => 'Document too large'], 413);
+                        throw new HttpException(413, 'Document too large');
                     }
                 }
 
@@ -214,7 +216,11 @@ class ChatController extends Controller
         });
 
         // Broadcast
-        event(new NewMessage($message));
+        try {
+            event(new NewMessage($message));
+        } catch (BroadcastException $e) {
+            Log::error('Broadcast failed for NewMessage: '.$e->getMessage(), ['exception' => $e]);
+        }
 
         // Format response payload with attachments metadata
         $attachmentsPayload = [];

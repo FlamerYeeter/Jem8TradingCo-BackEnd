@@ -157,6 +157,14 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
 
     Route::get('/dashboard', [Dashboard::class, 'allDashboard']);
 
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\NotificationsController::class, 'index']);
+    Route::get('/notifications/unread', [\App\Http\Controllers\NotificationsController::class, 'unreadCount']);
+    Route::post('/notifications/mark-read', [\App\Http\Controllers\NotificationsController::class, 'markRead']);
+    Route::post('/notifications/mark-all-read', [\App\Http\Controllers\NotificationsController::class, 'markAllRead']);
+    // Dev helper to simulate a notification for current user
+    Route::post('/notifications/simulate', [\App\Http\Controllers\NotificationsController::class, 'simulate']);
+
     // Chat
 
 
