@@ -7,6 +7,7 @@ use App\Http\Resources\ChatRoomResource;
 use App\Models\Message;
 use App\Models\LiveChat;
 use App\Models\Attachment;
+use App\Jobs\GenerateAttachmentThumbnails;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -210,6 +211,13 @@ class ChatController extends Controller
                     'thumbnail_path' => null,
                     'processing_status' => 'pending',
                 ]);
+
+                // Dispatch background job to generate thumbnails (will use sync queue if configured)
+                try {
+                    GenerateAttachmentThumbnails::dispatch($attachment);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to dispatch thumbnail job: '.$e->getMessage());
+                }
 
                 $attachments[] = $attachment;
             }
