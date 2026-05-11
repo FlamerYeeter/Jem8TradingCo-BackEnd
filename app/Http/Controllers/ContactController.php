@@ -20,18 +20,27 @@ class ContactController extends Controller
             $request->validate([
                 'first_name'   => 'required|string|max:255',
                 'last_name'    => 'required|string|max:255',
-                'phone_number' => 'nullable|string|max:20',
+                'phone_number' => 'nullable|string|max:50',
                 'email'        => 'required|email|max:255',
                 'message'      => 'required|string|max:2000',
+                'message_type' => 'nullable|in:inquiry,sales,finance,marketing,report_bugs',
+                'attachment'   => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,txt|max:5120',
             ]);
 
+            $attachmentPath = null;
+            if ($request->hasFile('attachment')) {
+                $attachmentPath = $request->file('attachment')->store('contact_attachments', 'public');
+            }
+
             $contact = Contact::create([
-                'first_name'   => $request->input('first_name'),
-                'last_name'    => $request->input('last_name'),
-                'phone_number' => $request->input('phone_number'),
-                'email'        => $request->input('email'),
-                'message'      => $request->input('message'),
-                'status'       => 'pending',
+                'first_name'      => $request->input('first_name'),
+                'last_name'       => $request->input('last_name'),
+                'phone_number'    => $request->input('phone_number'),
+                'email'           => $request->input('email'),
+                'message'         => $request->input('message'),
+                'message_type'    => $request->input('message_type') ?? 'inquiry',
+                'attachment_path' => $attachmentPath,
+                'status'          => 'pending',
             ]);
                  DB::table('notifications')->insert([
                 'user_id'    => null,

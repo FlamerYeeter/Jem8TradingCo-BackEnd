@@ -44,6 +44,13 @@ Route::get('/reviews/{review}', [ReviewController::class, 'show']);
 Route::get('/products/{product}/reviews', [ReviewController::class, 'index']);
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::post('/contact', [ContactController::class, 'store']);
+// also accept plural `/contacts` for API clients expecting `/api/contacts`
+Route::post('/contacts', [ContactController::class, 'store']);
+    
+// Product requests (public)
+Route::post('/product-requests', [\App\Http\Controllers\ProductRequestController::class, 'store']);
+// Product lookup used by frontend for auto-resolve
+Route::get('/products/search', [\App\Http\Controllers\ProductRequestController::class, 'searchProducts']);
 Route::get('/findaccount/{id}', [AccountController::class, 'show']);
 Route::get('/admin-leadership', [AdminLeadershipController::class, 'adminImgIndex']);
 
@@ -224,6 +231,12 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     // use {contactId} to bypass the global {id} numeric pattern so we can return
     // a clearer validation error when clients send invalid values like "undefined".
     Route::post('/admin/contacts/{contactId}/reply', [ContactController::class, 'reply']);
+
+    // Admin product-requests management
+    Route::get('/admin/product-requests', [\App\Http\Controllers\ProductRequestController::class, 'index']);
+    Route::get('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'show']);
+    Route::patch('/admin/product-requests/{id}/status', [\App\Http\Controllers\ProductRequestController::class, 'updateStatus']);
+    Route::delete('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'destroy']);
 
 
     Route::put('/accounts/{id}', [AccountController::class, 'update']);

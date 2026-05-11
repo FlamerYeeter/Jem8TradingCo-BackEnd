@@ -29,6 +29,8 @@ class Contact extends Model
         'phone_number',
         'email',
         'message',
+        'message_type',
+        'attachment_path',
         'status',
         'reply_message',
         'replied_by',
