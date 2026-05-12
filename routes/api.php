@@ -49,6 +49,8 @@ Route::post('/contacts', [ContactController::class, 'store']);
     
 // Product requests (public)
 Route::post('/product-requests', [\App\Http\Controllers\ProductRequestController::class, 'store']);
+// Allow GET to list/filter product requests (public use-cases: delivery attachments, lightweight listing)
+Route::get('/product-requests', [\App\Http\Controllers\ProductRequestController::class, 'indexPublic']);
 // Product lookup used by frontend for auto-resolve
 Route::get('/products/search', [\App\Http\Controllers\ProductRequestController::class, 'searchProducts']);
 Route::get('/findaccount/{id}', [AccountController::class, 'show']);
@@ -236,6 +238,7 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/admin/product-requests', [\App\Http\Controllers\ProductRequestController::class, 'index']);
     Route::get('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'show']);
     Route::patch('/admin/product-requests/{id}/status', [\App\Http\Controllers\ProductRequestController::class, 'updateStatus']);
+    Route::patch('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'update']);
     Route::delete('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'destroy']);
 
 

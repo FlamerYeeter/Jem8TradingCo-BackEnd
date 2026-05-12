@@ -77,6 +77,38 @@ class ProductRequestController extends Controller
         }
     }
 
+    // Public: list or filter product requests. Supports optional query params
+    // - delivery_id: integer
+    // - product_id: integer
+    // If authenticated, limits to current user's requests when no filters provided.
+    public function indexPublic(Request $request)
+    {
+        try {
+            $q = ProductRequest::query();
+
+            if ($request->has('delivery_id')) {
+                $q->where('delivery_id', $request->input('delivery_id'));
+            }
+            if ($request->has('product_id')) {
+                $q->where('product_id', $request->input('product_id'));
+            }
+
+            if (! $request->hasAny(['delivery_id','product_id'])) {
+                // if user is authenticated, return their requests; otherwise return empty array
+                if (optional(Auth::user())->id) {
+                    $q->where('user_id', Auth::id());
+                } else {
+                    return response()->json(['status' => 'success', 'data' => []], 200);
+                }
+            }
+
+            $results = $q->orderBy('created_at', 'desc')->get();
+            return response()->json(['status' => 'success', 'data' => $results], 200);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
     // Admin: show single
     public function show($id)
     {
@@ -109,6 +141,36 @@ class ProductRequestController extends Controller
             $pr = ProductRequest::findOrFail($id);
             $pr->delete();
             return response()->json(['status' => 'success', 'message' => 'Deleted'], 200);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // Admin: generic update to set status and attach to a delivery
+    public function update(Request $request, $id)
+    {
+        try {
+            // accept camelCase keys from frontend
+            if ($request->has('deliveryId') && !$request->has('delivery_id')) {
+                $request->merge(['delivery_id' => $request->input('deliveryId')]);
+            }
+
+            $request->validate([
+                'status' => 'nullable|in:pending,found,not-available',
+                'delivery_id' => 'nullable|numeric',
+            ]);
+
+            $pr = ProductRequest::findOrFail($id);
+
+            if ($request->has('status')) {
+                $pr->status = $request->input('status');
+            }
+            if ($request->has('delivery_id')) {
+                $pr->delivery_id = $request->input('delivery_id');
+            }
+
+            $pr->save();
+            return response()->json(['status' => 'success', 'data' => $pr], 200);
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }

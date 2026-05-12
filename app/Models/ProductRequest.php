@@ -17,6 +17,7 @@ class ProductRequest extends Model
         'product_name',
         'description',
         'image_path',
+        'delivery_id',
         'status',
     ];
 
