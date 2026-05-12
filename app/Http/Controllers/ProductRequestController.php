@@ -175,4 +175,65 @@ class ProductRequestController extends Controller
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
+
+    // Admin: create a minimal checkout + delivery from a product request and attach it
+    public function createOrder(Request $request, $id)
+    {
+        try {
+            $pr = ProductRequest::findOrFail($id);
+
+            if ($pr->delivery_id) {
+                return response()->json(['status' => 'error', 'message' => 'Product request already attached to a delivery'], 409);
+            }
+
+            $request->validate([
+                'payment_method' => 'sometimes|string|max:255',
+                'shipping_fee'   => 'sometimes|numeric|min:0',
+                'special_instructions' => 'sometimes|nullable|string|max:2000',
+            ]);
+
+            $userId = $pr->user_id ?? optional($request->user())->id;
+
+            \DB::beginTransaction();
+            // Create a minimal checkout record
+            $checkoutData = [
+                'user_id' => $userId,
+                'payment_method' => $request->input('payment_method', 'admin_created'),
+                'shipping_fee' => $request->input('shipping_fee', 0),
+                'paid_amount' => 0,
+                'special_instructions' => $request->input('special_instructions', $pr->description),
+            ];
+
+            $checkout = \App\Models\Checkout::create($checkoutData);
+
+            // Create delivery linked to the checkout
+            $delivery = \App\Models\Delivery::create([
+                'checkout_id' => $checkout->checkout_id,
+                'status' => 'processing',
+                'notes' => $pr->description,
+            ]);
+
+            // Attach delivery to product request and mark as found
+            $pr->delivery_id = $delivery->delivery_id;
+            $pr->status = 'found';
+            $pr->save();
+
+            \DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'product_request' => $pr,
+                    'checkout' => $checkout,
+                    'delivery' => $delivery,
+                ],
+            ], 201);
+        } catch (\Illuminate\Database\QueryException $qe) {
+            \DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => $qe->getMessage()], 500);
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
 }

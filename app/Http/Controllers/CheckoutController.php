@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Delivery;
+use App\Models\DeliveryRate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Cache;
 
@@ -90,6 +91,7 @@ public function index(Request $request)
             'payment_method'       => 'required|string|max:255',
             'payment_details'      => 'nullable|array',
             'shipping_fee'         => 'sometimes|numeric|min:0',
+            'delivery_type'        => 'sometimes|string|in:pickup,inhouse',
             'special_instructions' => 'sometimes|nullable|string|max:2000',
             'receipt_image'        => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
@@ -105,9 +107,10 @@ public function index(Request $request)
             return response()->json(['message' => 'No valid cart items found'], 400);
         }
 
-        $method      = $request->input('payment_method');
-        $details     = $request->input('payment_details', []);
-        $shippingFee = (float) $request->input('shipping_fee', 0);
+        $method       = $request->input('payment_method');
+        $details      = $request->input('payment_details', []);
+        $shippingFee  = (float) $request->input('shipping_fee', 0);
+        $deliveryType = $request->input('delivery_type', 'inhouse');
 
         // ── Resolve delivery address ──────────────────────────────────────
 $billingAddress = $details['billing_address'] ?? null;
@@ -184,6 +187,45 @@ if (is_string($billingAddress)) {
             $grandTotal += (float) $item->product->price * $item->quantity;
         }
 
+        // If pickup selected, shipping is zero. If inhouse, attempt to resolve
+        // a rate by location from `delivery_rates` table when shipping_fee
+        // was not explicitly provided.
+        if ($deliveryType === 'pickup') {
+            $shippingFee = 0.0;
+        } else {
+            // Resolve delivery address for rate lookup
+            $addrCity     = $billingAddress['city'] ?? null;
+            $addrProvince = $billingAddress['province'] ?? null;
+            $addrBarangay = $billingAddress['barangay'] ?? null;
+
+            if ($shippingFee <= 0) {
+                // Try most-specific match (barangay -> city+province -> province)
+                $rate = null;
+                if ($addrBarangay) {
+                    $rate = DeliveryRate::where('province', $addrProvince)
+                        ->where('city', $addrCity)
+                        ->where('barangay', $addrBarangay)
+                        ->first();
+                }
+                if (! $rate && $addrCity) {
+                    $rate = DeliveryRate::where('province', $addrProvince)
+                        ->where('city', $addrCity)
+                        ->whereNull('barangay')
+                        ->first();
+                }
+                if (! $rate && $addrProvince) {
+                    $rate = DeliveryRate::where('province', $addrProvince)
+                        ->whereNull('city')
+                        ->whereNull('barangay')
+                        ->first();
+                }
+
+                if ($rate) {
+                    $shippingFee = (float) $rate->fee;
+                }
+            }
+        }
+
         // ── Enforce COD limit (max 3 per user) ───────────────────────────
         if (strtolower($method) === 'cod') {
             $codCount = Checkout::where('user_id', $user->id)
@@ -246,6 +288,7 @@ $checkoutData = [
     'delivery_province'    => $billingAddress['province'] ?? null,
     'delivery_zip'         => $billingAddress['zip']      ?? null,
     'delivery_country'     => $billingAddress['country']  ?? 'Philippines',
+    'delivery_type'        => $deliveryType,
 ];
 
 if (Schema::hasColumn('checkouts', 'payment_details')) {
@@ -287,7 +330,7 @@ if (Schema::hasColumn('checkouts', 'payment_details')) {
             // ── Create delivery record ────────────────────────────────────
             $delivery = Delivery::create([
                 'checkout_id' => $checkout->checkout_id,
-                'status'      => 'processing',
+                'status'      => $deliveryType === 'pickup' ? 'ready' : 'processing',
                 'notes'       => $request->input('special_instructions'),
             ]);
 

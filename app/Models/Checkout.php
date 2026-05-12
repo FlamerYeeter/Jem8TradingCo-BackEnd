@@ -29,6 +29,7 @@ protected $fillable = [
     'delivery_province',
     'delivery_zip',
     'delivery_country',
+    'delivery_type',
 ];
 
 protected $casts = [

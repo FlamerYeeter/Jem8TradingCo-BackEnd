@@ -239,6 +239,7 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
     Route::get('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'show']);
     Route::patch('/admin/product-requests/{id}/status', [\App\Http\Controllers\ProductRequestController::class, 'updateStatus']);
     Route::patch('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'update']);
+    Route::post('/admin/product-requests/{id}/create-order', [\App\Http\Controllers\ProductRequestController::class, 'createOrder']);
     Route::delete('/admin/product-requests/{id}', [\App\Http\Controllers\ProductRequestController::class, 'destroy']);
 
 
