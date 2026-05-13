@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\ProductRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class ProductRequestController extends Controller
 {
@@ -41,9 +42,11 @@ class ProductRequestController extends Controller
                 'status'       => 'pending',
             ]);
 
-            return response()->json(['status' => 'success', 'data' => $pr], 201);
+            return response()->json(['data' => $pr], 201);
+        } catch (ValidationException $ve) {
+            return response()->json(['errors' => $ve->errors()], 422);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -60,9 +63,9 @@ class ProductRequestController extends Controller
                 ->limit(10)
                 ->get(['product_id as id', 'product_name as name', 'price']);
 
-            return response()->json(['status' => 'success', 'data' => $results], 200);
+            return response()->json(['data' => $results], 200);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -71,9 +74,9 @@ class ProductRequestController extends Controller
     {
         try {
             $list = ProductRequest::orderBy('created_at', 'desc')->get();
-            return response()->json(['status' => 'success', 'data' => $list], 200);
+            return response()->json(['data' => $list], 200);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -103,9 +106,9 @@ class ProductRequestController extends Controller
             }
 
             $results = $q->orderBy('created_at', 'desc')->get();
-            return response()->json(['status' => 'success', 'data' => $results], 200);
+            return response()->json(['data' => $results], 200);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -114,9 +117,9 @@ class ProductRequestController extends Controller
     {
         try {
             $pr = ProductRequest::findOrFail($id);
-            return response()->json(['status' => 'success', 'data' => $pr], 200);
+            return response()->json(['data' => $pr], 200);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -128,9 +131,12 @@ class ProductRequestController extends Controller
             $pr = ProductRequest::findOrFail($id);
             $pr->status = $request->input('status');
             $pr->save();
-            return response()->json(['status' => 'success', 'data' => $pr], 200);
+            return response()->json(['data' => $pr], 200);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            if ($e instanceof ValidationException) {
+                return response()->json(['errors' => $e->errors()], 422);
+            }
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -140,9 +146,9 @@ class ProductRequestController extends Controller
         try {
             $pr = ProductRequest::findOrFail($id);
             $pr->delete();
-            return response()->json(['status' => 'success', 'message' => 'Deleted'], 200);
+            return response()->json(['data' => ['message' => 'Deleted']], 200);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -170,9 +176,11 @@ class ProductRequestController extends Controller
             }
 
             $pr->save();
-            return response()->json(['status' => 'success', 'data' => $pr], 200);
+            return response()->json(['data' => $pr], 200);
+        } catch (ValidationException $ve) {
+            return response()->json(['errors' => $ve->errors()], 422);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 
@@ -221,7 +229,6 @@ class ProductRequestController extends Controller
             \DB::commit();
 
             return response()->json([
-                'status' => 'success',
                 'data' => [
                     'product_request' => $pr,
                     'checkout' => $checkout,
@@ -230,10 +237,10 @@ class ProductRequestController extends Controller
             ], 201);
         } catch (\Illuminate\Database\QueryException $qe) {
             \DB::rollBack();
-            return response()->json(['status' => 'error', 'message' => $qe->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$qe->getMessage()]]], 500);
         } catch (\Exception $e) {
             \DB::rollBack();
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 }

@@ -408,4 +408,124 @@ if (Schema::hasColumn('checkouts', 'payment_details')) {
             ], 500);
         }
     }
+
+    /**
+     * Return a shipping rate based on provided address or fallback.
+     * Expects `billing_address` (array) and optional `delivery_type` in request.
+     */
+    public function shippingRate(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $billingAddress = $request->input('billing_address', []);
+        if (is_string($billingAddress)) {
+            $billingAddress = json_decode($billingAddress, true) ?: [];
+        }
+
+        $deliveryType = $request->input('delivery_type', 'inhouse');
+
+        if ($deliveryType === 'pickup') {
+            return response()->json(['shipping_fee' => 0.0]);
+        }
+
+        $fee = $this->resolveShippingFeeFromAddress($billingAddress);
+
+        return response()->json(['shipping_fee' => $fee]);
+    }
+
+    /**
+     * Return a checkout preview (items, subtotal, shipping, total) without creating records.
+     * Expects `cart_ids` (array) and optional `billing_address` and `delivery_type`.
+     */
+    public function preview(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $request->validate([
+            'cart_ids' => 'required|array|min:1',
+        ]);
+
+        $cartIds = $request->input('cart_ids');
+
+        $cartItems = Cart::where('user_id', $user->id)
+            ->whereIn('cart_id', $cartIds)
+            ->with('product')
+            ->get();
+
+        if ($cartItems->isEmpty()) {
+            return response()->json(['message' => 'No valid cart items found'], 400);
+        }
+
+        $subtotal = 0;
+        foreach ($cartItems as $item) {
+            $subtotal += (float) $item->product->price * $item->quantity;
+        }
+
+        $deliveryType = $request->input('delivery_type', 'inhouse');
+
+        $shippingFee = 0.0;
+        if ($deliveryType !== 'pickup') {
+            $billingAddress = $request->input('billing_address', []);
+            if (is_string($billingAddress)) {
+                $billingAddress = json_decode($billingAddress, true) ?: [];
+            }
+            $shippingFee = $this->resolveShippingFeeFromAddress($billingAddress);
+        }
+
+        $total = $subtotal + $shippingFee;
+
+        return response()->json([
+            'items' => $cartItems->map(fn($i) => [
+                'product_id' => $i->product_id,
+                'quantity'   => $i->quantity,
+                'price'      => $i->product->price,
+            ]),
+            'subtotal' => number_format($subtotal, 2, '.', ''),
+            'shipping_fee' => number_format($shippingFee, 2, '.', ''),
+            'total' => number_format($total, 2, '.', ''),
+        ]);
+    }
+
+    /**
+     * Resolve shipping fee from `delivery_rates` table or fall back to a default.
+     */
+    private function resolveShippingFeeFromAddress(?array $billingAddress): float
+    {
+        $addrCity     = $billingAddress['city'] ?? null;
+        $addrProvince = $billingAddress['province'] ?? null;
+        $addrBarangay = $billingAddress['barangay'] ?? null;
+
+        $rate = null;
+        if ($addrBarangay) {
+            $rate = DeliveryRate::where('province', $addrProvince)
+                ->where('city', $addrCity)
+                ->where('barangay', $addrBarangay)
+                ->first();
+        }
+        if (! $rate && $addrCity) {
+            $rate = DeliveryRate::where('province', $addrProvince)
+                ->where('city', $addrCity)
+                ->whereNull('barangay')
+                ->first();
+        }
+        if (! $rate && $addrProvince) {
+            $rate = DeliveryRate::where('province', $addrProvince)
+                ->whereNull('city')
+                ->whereNull('barangay')
+                ->first();
+        }
+
+        if ($rate) {
+            return (float) $rate->fee;
+        }
+
+        // Fallback flat fee when shipping service is unavailable
+        return 50.00;
+    }
 }

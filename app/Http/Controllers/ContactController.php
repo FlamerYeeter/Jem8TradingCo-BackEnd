@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreContactRequest;
 use Illuminate\Http\Request;
 use App\Models\Contact;
 use Illuminate\Support\Facades\Mail;
@@ -11,32 +12,44 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 class ContactController extends Controller
 {
     // ✅ POST - Create contact message (public)
-    public function store(Request $request)
+    public function store(StoreContactRequest $request)
     {
         try {
-            $request->validate([
-                'first_name'   => 'required|string|max:255',
-                'last_name'    => 'required|string|max:255',
-                'phone_number' => 'nullable|string|max:50',
-                'email'        => 'required|email|max:255',
-                'message'      => 'required|string|max:2000',
-                'message_type' => 'nullable|in:inquiry,sales,finance,marketing,report_bugs',
-                'attachment'   => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,txt|max:5120',
-            ]);
-
             $attachmentPath = null;
             if ($request->hasFile('attachment')) {
                 $attachmentPath = $request->file('attachment')->store('contact_attachments', 'public');
             }
 
+            // if frontend used nested `contact` object, extract fields
+            if ($request->has('contact')) {
+                $c = $request->input('contact');
+                $fullName = trim($c['name'] ?? '');
+                if (!empty($fullName)) {
+                    $parts = preg_split('/\s+/', $fullName, 2);
+                    $first = $parts[0] ?? '';
+                    $last  = $parts[1] ?? '';
+                } else {
+                    $first = $request->input('first_name', '');
+                    $last  = $request->input('last_name', '');
+                }
+                $email = $c['email'] ?? $request->input('email');
+                $phone = $c['phone'] ?? $request->input('phone_number') ?? '';
+            } else {
+                $first = $request->input('first_name');
+                $last  = $request->input('last_name');
+                $email = $request->input('email');
+                $phone = $request->input('phone_number') ?? '';
+            }
+
             $contact = Contact::create([
-                'first_name'      => $request->input('first_name'),
-                'last_name'       => $request->input('last_name'),
-                'phone_number'    => $request->input('phone_number'),
-                'email'           => $request->input('email'),
+                'first_name'      => $first,
+                'last_name'       => $last,
+                'phone_number'    => $phone,
+                'email'           => $email,
                 'message'         => $request->input('message'),
                 'message_type'    => $request->input('message_type') ?? 'inquiry',
                 'attachment_path' => $attachmentPath,
@@ -61,10 +74,12 @@ class ContactController extends Controller
                 ]);
             }
 
-            return response()->json(['status' => 'success', 'data' => $contact], 201);
+            return response()->json(['data' => $contact], 201);
 
+        } catch (ValidationException $ve) {
+            return response()->json(['errors' => $ve->errors()], 422);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);
         }
     }
 

@@ -24,6 +24,7 @@ use App\Http\Controllers\AdminsettingsController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DevTeamController;
 // Public routes
 // enforce numeric `{id}` route parameter globally
 Route::pattern('id', '[0-9]+');
@@ -49,12 +50,16 @@ Route::post('/contacts', [ContactController::class, 'store']);
     
 // Product requests (public)
 Route::post('/product-requests', [\App\Http\Controllers\ProductRequestController::class, 'store']);
+// Quote requests (public, JSON)
+Route::post('/quotes', [\App\Http\Controllers\QuoteController::class, 'store']);
 // Allow GET to list/filter product requests (public use-cases: delivery attachments, lightweight listing)
 Route::get('/product-requests', [\App\Http\Controllers\ProductRequestController::class, 'indexPublic']);
 // Product lookup used by frontend for auto-resolve
 Route::get('/products/search', [\App\Http\Controllers\ProductRequestController::class, 'searchProducts']);
 Route::get('/findaccount/{id}', [AccountController::class, 'show']);
 Route::get('/admin-leadership', [AdminLeadershipController::class, 'adminImgIndex']);
+// App dev team (public)
+Route::get('/dev-team', [DevTeamController::class, 'index']);
 
 
 // Routes that require authentication
@@ -249,3 +254,6 @@ Route::middleware([EnsureTokenIsValid::class])->group(function () {
 
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
+    // Shipping rate lookup (fallback) and preview endpoint used by frontend
+    Route::match(['get','post'],'/shipping-rate', [CheckoutController::class, 'shippingRate']);
+    Route::match(['get','post'],'/checkout/preview', [CheckoutController::class, 'preview']);

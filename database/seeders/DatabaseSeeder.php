@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
+        // Register app dev team seeder
+        $this->call(\Database\Seeders\AppDevTeamSeeder::class);
+
         // Register product seeder
         $this->call(\Database\Seeders\ProductSeeder::class);
     }
