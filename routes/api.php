@@ -16,6 +16,8 @@ use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DeliveryItemsController;
+use App\Http\Controllers\PaymentsController;
 use App\Http\Controllers\AdminLeadershipController;
 use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\ActivityLogController;
@@ -100,6 +102,17 @@ Route::delete('/accounts/{id}', [AccountController::class, 'adminDestroy']);
     Route::get('/my-deliveries', [DeliveryController::class, 'indexUser']);
     Route::get('/deliveries', [DeliveryController::class, 'index']);
     Route::patch('/deliveries/{deliveryId}/status', [DeliveryController::class, 'updateStatus']);
+    // Sales: update item prices on a delivery
+    Route::patch('/deliveries/{id}/items', [\App\Http\Controllers\DeliveryItemsController::class, 'update'])
+        ->middleware('department:Sales');
+
+    // Payments: list, update status, upload 2307 (Finance)
+    Route::get('/payments', [\App\Http\Controllers\PaymentsController::class, 'index'])
+        ->middleware('department:Finance');
+    Route::patch('/payments/{id}/status', [\App\Http\Controllers\PaymentsController::class, 'updateStatus'])
+        ->middleware('department:Finance');
+    Route::post('/payments/{id}/upload-2307', [\App\Http\Controllers\PaymentsController::class, 'upload2307'])
+        ->middleware('department:Finance');
 
     Route::get('/showAllUser', [AccountController::class, 'index']);
     Route::get('/showUser/{id}', [AccountController::class, 'show']);

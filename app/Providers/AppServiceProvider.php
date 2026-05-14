@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Routing\Router;
+
+use App\Http\Middleware\EnsureDepartment;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Register route middleware alias for department checks
+        if ($this->app->resolved('router')) {
+            /** @var Router $router */
+            $router = $this->app->make('router');
+            $router->aliasMiddleware('department', EnsureDepartment::class);
+        }
     }
 }
