@@ -274,6 +274,7 @@ class AccountController extends Controller
                         : asset('storage/' . $user->profile_image))
                     : null,
                 'tin_number'        => $user->tin_number ?? null,
+                'department'        => $user->department ?? null,
                 'email_verified_at' => $user->email_verified_at,
                 'created_at'        => $user->created_at,
             ]
@@ -431,6 +432,7 @@ class AccountController extends Controller
             'email',
             'phone_number',
             'role',
+            'department',
         ]));
 
         return response()->json(['data' => $account]);

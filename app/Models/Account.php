@@ -67,8 +67,13 @@ class Account extends Authenticatable
         'password_reset_code',
         'password_reset_expires_at',
         'email_verified_at',
+        'department',
         'profile_image',
         'tin_number'
+    ];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
     ];
 
     protected $hidden = [
