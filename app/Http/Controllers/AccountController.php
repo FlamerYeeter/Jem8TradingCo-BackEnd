@@ -108,7 +108,11 @@ class AccountController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Login successful',
-            'token'   => $token,
+            'data'    => [
+                'token' => $token,
+                'access_token' => $token,
+                'user'  => $this->normalizeUser($account),
+            ],
         ])->withCookie($cookie);
     }
 
@@ -254,31 +258,50 @@ class AccountController extends Controller
         if (!$user) {
             return response()->json(['status' => 'failed', 'message' => 'Unauthenticated'], 401);
         }
-
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'id'                => $user->id,
-                'google_id'         => $user->google_id ?? null,
-                'first_name'        => $user->first_name,
-                'last_name'         => $user->last_name,
-                'phone_number'      => $user->phone_number,
-                'company_name'      => $user->company_name ?? null,
-                'position'          => $user->position ?? null,
-                'business_type'     => $user->business_type ?? null,
-                'email'             => $user->email,
-                'role'              => $user->role,
-                'profile_image'     => $user->profile_image
-                    ? (str_starts_with($user->profile_image, 'http')
-                        ? $user->profile_image
-                        : asset('storage/' . $user->profile_image))
-                    : null,
-                'tin_number'        => $user->tin_number ?? null,
-                'department'        => $user->department ?? null,
-                'email_verified_at' => $user->email_verified_at,
-                'created_at'        => $user->created_at,
-            ]
+            'data'   => $this->normalizeUser($user),
         ]);
+    }
+
+    /**
+     * Normalize user object for API responses.
+     * Ensures `department` is a trimmed string or null and `is_admin` is boolean.
+     */
+    protected function normalizeUser($user)
+    {
+        $deptRaw = $user->department ?? null;
+        $dept = null;
+        if (!is_null($deptRaw)) {
+            $dept = trim((string) $deptRaw);
+            if ($dept === '') $dept = null;
+        }
+
+        $profileImage = null;
+        if ($user->profile_image) {
+            $profileImage = str_starts_with($user->profile_image, 'http')
+                ? $user->profile_image
+                : asset('storage/' . $user->profile_image);
+        }
+
+        return [
+            'id'                => $user->id,
+            'google_id'         => $user->google_id ?? null,
+            'first_name'        => $user->first_name,
+            'last_name'         => $user->last_name,
+            'phone_number'      => $user->phone_number,
+            'company_name'      => $user->company_name ?? null,
+            'position'          => $user->position ?? null,
+            'business_type'     => $user->business_type ?? null,
+            'email'             => $user->email,
+            'role'              => $user->role ?? null,
+            'is_admin'          => (bool) ($user->is_admin ?? false),
+            'profile_image'     => $profileImage,
+            'tin_number'        => $user->tin_number ?? null,
+            'department'        => $dept,
+            'email_verified_at' => $user->email_verified_at,
+            'created_at'        => $user->created_at,
+        ];
     }
 
     // ==============================

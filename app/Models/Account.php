@@ -80,4 +80,14 @@ class Account extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    // Normalized admin flag based on role or explicit is_admin attribute
+    public function getIsAdminAttribute()
+    {
+        if (isset($this->attributes['is_admin'])) {
+            return (bool) $this->attributes['is_admin'];
+        }
+
+        return in_array(strtolower($this->role ?? ''), ['admin', 'administrator']);
+    }
 }

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\ProductRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class ProductRequestController extends Controller
 {
@@ -13,12 +14,40 @@ class ProductRequestController extends Controller
     public function store(Request $request)
     {
         try {
+            // Log incoming payload for debugging frontend integration
+            Log::info('ProductRequest store called', ['payload' => $request->all(), 'headers' => $request->headers->all()]);
+
             // Accept camelCase from some frontends, normalize to snake_case
             if ($request->has('productId') && !$request->has('product_id')) {
                 $request->merge(['product_id' => $request->input('productId')]);
             }
             if ($request->has('productName') && !$request->has('product_name')) {
                 $request->merge(['product_name' => $request->input('productName')]);
+            }
+
+            // Accept a `product` object (array or JSON) from some frontends
+            if ($request->has('product') && !$request->has('product_id')) {
+                $prod = $request->input('product');
+                if (is_string($prod)) {
+                    $decoded = json_decode($prod, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $prod = $decoded;
+                    }
+                }
+                if (is_array($prod)) {
+                    if (isset($prod['id'])) {
+                        $request->merge(['product_id' => $prod['id']]);
+                    } elseif (isset($prod['product_id'])) {
+                        $request->merge(['product_id' => $prod['product_id']]);
+                    }
+                    if (!$request->has('product_name')) {
+                        if (isset($prod['name'])) {
+                            $request->merge(['product_name' => $prod['name']]);
+                        } elseif (isset($prod['product_name'])) {
+                            $request->merge(['product_name' => $prod['product_name']]);
+                        }
+                    }
+                }
             }
 
             $request->validate([
@@ -73,7 +102,7 @@ class ProductRequestController extends Controller
     public function index()
     {
         try {
-            $list = ProductRequest::orderBy('created_at', 'desc')->get();
+            $list = ProductRequest::with(['product','user'])->orderBy('created_at', 'desc')->get();
             return response()->json(['data' => $list], 200);
         } catch (\Exception $e) {
             return response()->json(['errors' => ['server' => [$e->getMessage()]]], 500);

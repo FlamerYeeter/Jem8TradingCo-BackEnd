@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('image_path')->nullable();
             $table->enum('status', ['pending','found','not-available'])->default('pending');
             $table->timestamps();
+            $table->engine = 'InnoDB';
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
             $table->foreign('product_id')->references('product_id')->on('products')->onDelete('set null');
